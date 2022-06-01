@@ -7,17 +7,24 @@ export default class PDFExtractor extends FormApplication {
         options.height = 800;
         options.title = "pdf extractor";
         options.resizeable = true;
+        options.submitOnChange = true;
+        options.closeOnSubmit = false
         return options
     }
 
     constructor() {
         super();
-        this.object.pdfUrl = ""
+        this.object = {
+            pdfUrl: "",
+            pdf: null,
+            activePage: 1
+        }
 
     }
 
     getData() {
         const data = super.getData();
+        data.object = game.settings.get("pdfExtractor", "pdfExtractor")
 
 
         return data;
@@ -26,12 +33,12 @@ export default class PDFExtractor extends FormApplication {
 
     _updateObject(event, formData) {
         const data = expandObject(formData);
-        console.log(data)
+        game.settings.set('torgeternity', 'deckSetting', data);
     }
     activateListeners(html) {
 
         let fileButton = html.find("#pdfFileSelector")[0];
-        fileButton.addEventListener("click", this.test.bind(this))
+        fileButton.addEventListener("click", this.chooseFile.bind(this))
         let renderButton = html.find("#renderPdf")[0];
         renderButton.addEventListener("click", this.renderPdf.bind(this))
 
@@ -39,13 +46,14 @@ export default class PDFExtractor extends FormApplication {
         super.activateListeners(html);
 
     }
-    test(ev) {
+    chooseFile(ev) {
         ev.preventDefault();
         const fp = new FilePicker({
             type: "text",
             current: this.object.pdfUrl,
-            callback: path => {
+            callback: async path => {
                 this.setPdfUrl(path);
+                await this.renderPdf(path)
                 this.render(true);
 
             },
@@ -58,15 +66,14 @@ export default class PDFExtractor extends FormApplication {
         this.object.pdfUrl = path
         return this
     }
-    completDocument(str) {
-        document.roughtText += str
-    }
-    async renderPdf(ev) {
-        ev.preventDefault();
 
-        var loadingTask = pdfjsLib.getDocument(this.object.pdfUrl);
+    async renderPdf(path) {
+
+        let obj = this.object;
+        var loadingTask = pdfjsLib.getDocument(path);
         loadingTask.promise.then(function(pdf) {
-            pdf.getPage(1).then(function(page) {
+            obj.pdf = pdf;
+            pdf.getPage(obj.activePage).then(function(page) {
                 // you var scale = 1.5;
                 var viewport = page.getViewport({ scale: 0.5, });
                 // Support HiDPI-screens.

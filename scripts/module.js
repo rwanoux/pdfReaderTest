@@ -1,15 +1,23 @@
 import PDFExtractor from "./pdfExtractor.js";
 Hooks.once('init', async function() {
-
+    game.settings.register('pdfExtractor', 'pdfExtractor', {
+        scope: 'world',
+        config: false,
+        type: Object,
+        default: {
+            pdfUrl: "",
+            pdf: null,
+            activePage: 1
+        }
+    });
 });
-let text = ""
+
+
 Hooks.once('ready', async function() {
 
-
-
-
-
 });
+
+
 Hooks.on("renderSidebarTab", (app, html) => {
     if (app.options.id == "settings") {
         let button = $(`<button><i class="fas fa-download"></i> pdfExtractor</button>`)
