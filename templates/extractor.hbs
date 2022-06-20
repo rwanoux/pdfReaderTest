@@ -9,11 +9,10 @@
     </style>
     <h3>{{pdfUrl}}</h3>
     <div class="flexrow">
-        <a id="pdfFileSelector">
-            <i class="fas fa-download"""></i>select pdf file
-        </a>
-
-
+        <div class="form-fields">
+            {{filePicker target="pdfUrl" }}
+            <input type="text" id="pdfUrl" name="pdfUrl" placeholder="{{localize 'File Path'}}" value="{{pdfUrl}}" />
+        </div>
         <a id="createHtml">
             <i class="fab fa-searchengin"></i>createHtml
         </a>
@@ -23,7 +22,7 @@
         <div>
             <div class="flexrow">
                 <a id="pdfPrevious" <i class="far fa-caret-square-left"></i></a>
-                <input type="number" id="activePage" name="activePage" value="{{object.activePage}}">
+                <input type="number" id="activePage" name="activePage" value="{{activePage}}">
                 <a id="pdfNext"><i class="far fa-caret-square-right"></i></a>
             </div>
             <div id="pdfContainer">

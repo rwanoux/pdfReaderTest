@@ -39,13 +39,10 @@ export default class PDFExtractor extends FormApplication {
     }
     async activateListeners(html) {
 
-        if (this.pdfUrl) {
-            await this.renderPdf(this.object.pdfUrl)
-        }
 
 
-        let fileButton = html.find("#pdfFileSelector")[0];
-        fileButton.addEventListener("click", this.chooseFile.bind(this));
+
+
         /*
                 let createHtmlButton = html.find("#createHtml")[0];
                 createHtmlButton.addEventListener("click", this.createHtml.bind(this))
@@ -55,7 +52,10 @@ export default class PDFExtractor extends FormApplication {
         let prevBut = html.find("#pdfPrevious")[0];
         prevBut.addEventListener("click", this.previous.bind(this))
         let nextBut = html.find("#pdfNext")[0];
-        nextBut.addEventListener("click", this.nextPage.bind(this))
+        nextBut.addEventListener("click", this.nextPage.bind(this));
+        let inputUrl = html.find("#pdfUrl")[0];
+        inputUrl.addEventListener("change", this.setPdfUrl.bind(this));
+
 
         let textLayer = html.find("#text-layer")[0];
         textLayer.addEventListener("mouseup", this.getSelection.bind(this))
@@ -63,6 +63,9 @@ export default class PDFExtractor extends FormApplication {
 
 
         super.activateListeners(html);
+        if (this.pdfUrl) {
+            await this.renderPdf(this.object.pdfUrl)
+        }
 
     }
 
@@ -70,6 +73,15 @@ export default class PDFExtractor extends FormApplication {
         if (window.getSelection().toString().length > 0) {
             console.log(window.getSelection().toString().replace(/[\r\n]+/gm, " "))
         }
+
+    }
+
+    async setPdfUrl(ev) {
+        let obj = await game.settings.get("pdfExtractor", "pdfExtractor")
+        obj.pdfUrl = document.getElementById('pdfUrl').value;
+        this.pdfUrl = document.getElementById('pdfUrl').value;
+        await game.settings.set("pdfExtractor", "pdfExtractor", obj)
+        return this.renderPdf()
 
     }
 
@@ -210,29 +222,7 @@ export default class PDFExtractor extends FormApplication {
 
     }
 
-    chooseFile(ev) {
-        ev.preventDefault();
-        const fp = new FilePicker({
-            type: "text",
-            current: this.pdfUrl,
-            callback: async path => {
-                this.setPdfUrl(path);
-                await this.renderPdf(path);
-                await this.scanPdf();
-                this.render(true);
 
-            },
-        });
-        return fp.browse();
-    }
-    async setPdfUrl(path) {
-        let obj = await game.settings.get("pdfExtractor", "pdfExtractor")
-        obj.pdfUrl = path;
-        this.pdfUrl = path;
-        await game.settings.set("pdfExtractor", "pdfExtractor", obj)
-        return this.render()
-
-    }
 
     async renderPdf() {
         let activePage = this.activePage
