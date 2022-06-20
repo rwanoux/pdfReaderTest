@@ -13,8 +13,8 @@
             {{filePicker target="pdfUrl" }}
             <input type="text" id="pdfUrl" name="pdfUrl" placeholder="{{localize 'File Path'}}" value="{{pdfUrl}}" />
         </div>
-        <a id="createHtml">
-            <i class="fab fa-searchengin"></i>createHtml
+        <a id="scanPage">
+            <i class="fab fa-searchengin"></i>scan
         </a>
 
     </div>
@@ -58,7 +58,12 @@
         </ul>
 
     </div>
-
+    <div>
+        {{#each contents as |cont id|}}
+        <div>{{{cont.str}}}</div>
+        <h4>{{id}}</h4>
+        {{/each}}
+    </div>
     <div id="htmlContent">
         {{{html}}}
 

@@ -7,7 +7,7 @@ export default class PDFExtractor extends FormApplication {
         options.height = 920;
         options.left = 80;
         options.title = "pdf extractor";
-        options.resizeable = true;
+        options.resizable = true;
         options.submitOnChange = true;
         options.closeOnSubmit = false;
         options.editable = true;
@@ -16,12 +16,9 @@ export default class PDFExtractor extends FormApplication {
 
     constructor() {
 
-        super();
+        let data = super();
+        return mergeObject(data, game.settings.get("pdfExtractor", "pdfExtractor"))
 
-        this.pdfUrl = "";
-        this.activePage = 1;
-        this.pages = [];
-        this.fonts = {};
 
     }
 
@@ -43,19 +40,19 @@ export default class PDFExtractor extends FormApplication {
 
 
 
-        /*
-                let createHtmlButton = html.find("#createHtml")[0];
-                createHtmlButton.addEventListener("click", this.createHtml.bind(this))
-        */
+
+        let scanPage = html.find("#scanPage")[0];
+        scanPage.addEventListener("click", this.scanPage.bind(this))
+
         let pageInput = html.find("#activePage")[0];
         pageInput.addEventListener("change", this.changePage.bind(this))
         let prevBut = html.find("#pdfPrevious")[0];
         prevBut.addEventListener("click", this.previous.bind(this))
         let nextBut = html.find("#pdfNext")[0];
         nextBut.addEventListener("click", this.nextPage.bind(this));
+
         let inputUrl = html.find("#pdfUrl")[0];
         inputUrl.addEventListener("change", this.setPdfUrl.bind(this));
-
 
         let textLayer = html.find("#text-layer")[0];
         textLayer.addEventListener("mouseup", this.getSelection.bind(this))
@@ -71,8 +68,9 @@ export default class PDFExtractor extends FormApplication {
 
     getSelection(ev) {
         if (window.getSelection().toString().length > 0) {
-            console.log(window.getSelection().toString().replace(/[\r\n]+/gm, " "))
+            let cont = document.getElementById('htmlContent').append(window.getSelection())
         }
+
 
     }
 
@@ -94,130 +92,71 @@ export default class PDFExtractor extends FormApplication {
 
     }
     nextPage(ev) {
-        console.log(this)
+
         this.activePage++;
+        document.getElementById('activePage').value = this.activePage
+
         this.renderPdf(this.pdfUrl)
     }
     previous(ev) {
         this.activePage--;
+        document.getElementById('activePage').value = this.activePage
         this.renderPdf(this.pdfUrl)
     }
-    async createHtml(ev) {
-        let htmlContent = document.createElement("div");
-        let container = document.getElementById('htmlContent');
-        let tagSelectors = document.getElementsByClassName("fontTag")
-        for (let selector of tagSelectors) {
-            this.object.fonts[selector.getAttribute("data-font")].tag = selector.options[selector.selectedIndex].value
-        }
 
-        for (let page of this.object.pages) {
-            for (let i = 0; i < page.items.length; i++) {
-                let it = page.items[i];
-                if (it.str != page.items[i - 1]?.str) {
+    async scanPage() {
+        let obj = this;
+        var loadingTask = await pdfjsLib.getDocument(this.pdfUrl);
+        obj.fonts = {};
+        obj.contents = [];
+        obj.pages = [];
+        let responses = 0
 
-                    if (!it.str.startsWith(" ") || page.items[i - 1]?.str.endsWith(" ")) {
-                        it.str = " " + it.str
-                    }
-
-                    if (container.lastChild && container.lastElementChild?.tagName.toUpperCase() == this.object.fonts[it.fontName].tag.toUpperCase()) {
-                        container.lastChild.innerText += it.str
-
-
-                    } else if (this.object.fonts[it.fontName].tag != "dont display") {
-                        let el = document.createElement(this.object.fonts[it.fontName].tag);
-                        el.classList.add(it.fontName);
-                        el.innerText = it.str;
-                        htmlContent.append(el)
-                    }
-                }
-
-                let el = document.createElement(this.object.fonts[it.fontName].tag);
-                el.classList.add(it.fontName);
-                el.innerText = it.str;
-                htmlContent.append(el)
-
-            }
-        }
-
-        container.innerHTML = "";
-        container.append(htmlContent);
-        this.object.html = container.innerHTML
-        await game.settings.set("pdfExtractor", "pdfExtractor", this.object)
-    }
-    async scanPdf() {
-        let obj = this.object;
-        var loadingTask = await pdfjsLib.getDocument(this.object.pdfUrl);
-        let maxPages;
-        let totalText = "";
-        let pages;
-        let countPromises = 0; // collecting all page promises
-        obj.fonts = {}
 
         loadingTask.promise.then(async function (pdf) {
-            maxPages = pdf._pdfInfo.numPages;
-            pages = new Array(maxPages);
-
+            let maxPage = pdf.numPages;
             //getting textContent by pages
-            for (var j = 1; j <= maxPages; j++) {
-                let pageText = ""
-                var page = await pdf.getPage(j);
-                pages[page._pageIndex] = await page.getTextContent();
-
-
-
-                countPromises++;
-                if (countPromises == maxPages) {
-                    console.log('all pages scanned')
-                    console.log(totalText)
-
-                }
+            for (var j = 0; j <= maxPage - 1; j++) {
+                var page = await pdf.getPage(j + 1);
+                obj.pages[j] = await page.getTextContent();
             }
 
-
-            obj.pages = pages
-            ui.pdfExtractor = mergeObject(ui.pdfExtractor, obj);
-            console.log(obj)
-            game.settings.set("pdfExtractor", "pdfExtractor", obj);
-            console.log(obj);
-            let fonts = {};
-            let sizes = {}
-            for (let i = 0; i < pages.length; i++) {
-
-                let p = pages[i]
+            for (let i = 0; i < obj.pages.length; i++) {
+                let p = obj.pages[i];
                 for (let style in p.styles) {
-                    if (!fonts[style]) {
+                    if (!obj.fonts[style]) {
                         let s = p.styles[style]
-
-                        fonts[style] = s
+                        obj.fonts[style] = s
                     }
                 }
-                //ksdjlksqjdlkfjqlskdjfqlksdjfl
                 for (let it of p.items) {
-                    // console.log(it.str)
-                    if (!fonts[it.fontName].exemple && it.str != "") {
-                        fonts[it.fontName].exemple = {
-                            page: i + 1,
-                            text: it.str
+
+                    //unique content
+                    if (it.height != 0 && p.items[p.items.indexOf(it) - 1]?.str != it.str) {
+                        it.str = it.str.replace("�", "").replace("�", "")
+                        obj.contents.push(it)
+                        if (!obj.sizes[it.height]) {
+                            obj.sizes[it.height] = {
+                                tag: "truc"
+                            }
                         }
                     }
-                    if (!sizes[it.height]) {
-                        sizes[it.height] = {
-                            tag: "untagged"
-                        }
-                    }
-                    totalText += it.str
+
+
                 }
 
-                obj.fonts = fonts;
-                obj.sizes = sizes;
-            }
 
+                if (i == obj.pages.length - 1) {
+                    let data = {
+                        fonts: obj.fonts,
+                        sizes: obj.sizes,
+                        contents: obj.contents
+                    }
+                    await game.settings.set("pdfExtractor", "pdfExtractor", mergeObject(game.settings.get("pdfExtractor", "pdfExtractor"), data))
 
-            await game.settings.set("pdfExtractor", "pdfExtractor", obj)
-
-        })
-        this.render(true)
-
+                }
+            } return pdf
+        }).then(this.render());
 
 
     }
@@ -225,7 +164,7 @@ export default class PDFExtractor extends FormApplication {
 
 
     async renderPdf() {
-        let activePage = this.activePage
+        let activePage = this.activePage || 1;
         var loadingTask = pdfjsLib.getDocument(this.pdfUrl);
         loadingTask.promise.then(async function (pdf) {
 
@@ -253,14 +192,11 @@ export default class PDFExtractor extends FormApplication {
                 };
                 await page.render(renderContext)
                 let textContent = await page.getTextContent()
-                console.log(textContent)
                 document.getElementById("text-layer").innerHTML = "";
                 textContent.items.forEach(it => {
-                    console.log(it.str)
                     it.str = it.str.replace(String.fromCharCode(65533), "-")
                     /*carCode=65533,
                     for (var i = 0; i < it.str.length; i++) {
-                        console.log("Code ASCII de " + it.str.charAt(i) + "=" + it.str.charCodeAt(i));
                     }
                     */
                 })
