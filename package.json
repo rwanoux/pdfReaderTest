@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "pdf.js-extract": "^0.2.0"
+    "pdf.js-extract": "^0.2.0",
+    "pspdfkit": "^2022.2.3"
   }
 }

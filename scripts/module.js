@@ -1,4 +1,6 @@
 import PDFExtractor from "./pdfExtractor.js";
+
+
 Hooks.once('init', async function() {
     game.settings.register('pdfExtractor', 'pdfExtractor', {
         scope: 'world',
@@ -9,9 +11,12 @@ Hooks.once('init', async function() {
             pdf: null,
             activePage: 1,
             pages: [],
-            fonts: []
+            fonts: {}
         }
     });
+
+
+
 });
 
 

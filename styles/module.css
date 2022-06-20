@@ -1,0 +1,30 @@
+#text-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 1;
+    line-height: 1.0;
+    color: rgba(0, 0, 0, 0.267);
+    cursor: text;
+    user-select: text!important;
+    -webkit-user-select: textt!important;
+    -moz-user-select: textt!important;
+}
+
+#text-layer>span {
+    color: transparent;
+    position: absolute;
+    cursor: text;
+    transform-origin: 0% 0%;
+    user-select: text!important;
+    -webkit-user-select: textt!important;
+    -moz-user-select: textt!important;
+}
+
+#pdfContainer {
+    position: relative;
+    user-select: auto;
+    resize: both;
+}
