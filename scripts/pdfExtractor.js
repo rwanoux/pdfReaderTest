@@ -109,6 +109,7 @@ export default class PDFExtractor extends FormApplication {
         var loadingTask = await pdfjsLib.getDocument(this.pdfUrl);
         obj.fonts = {};
         obj.contents = [];
+        obj.sizes = {};
         obj.pages = [];
         let responses = 0
 
@@ -133,7 +134,8 @@ export default class PDFExtractor extends FormApplication {
 
                     //unique content
                     if (it.height != 0 && p.items[p.items.indexOf(it) - 1]?.str != it.str) {
-                        it.str = it.str.replace("�", "").replace("�", "")
+                        it.str = it.str.replace("�", "").replace("�", "");
+                        it.numPage = i + 1
                         obj.contents.push(it)
                         if (!obj.sizes[it.height]) {
                             obj.sizes[it.height] = {
@@ -150,12 +152,13 @@ export default class PDFExtractor extends FormApplication {
                     let data = {
                         fonts: obj.fonts,
                         sizes: obj.sizes,
-                        contents: obj.contents
+                        contents: obj.contents,
+
                     }
                     await game.settings.set("pdfExtractor", "pdfExtractor", mergeObject(game.settings.get("pdfExtractor", "pdfExtractor"), data))
 
                 }
-            } return pdf
+            } return this
         }).then(this.render());
 
 
