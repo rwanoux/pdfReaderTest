@@ -22,6 +22,7 @@ export default class PDFExtractor extends FormApplication {
 
     }
 
+
     getData() {
         const data = game.settings.get("pdfExtractor", "pdfExtractor")
 
@@ -87,7 +88,7 @@ export default class PDFExtractor extends FormApplication {
         ev.preventDefault();
         this.activePage = parseInt(ev.currentTarget.value);
         await this.renderPdf(this.pdfUrl)
-        //  game.settings.set("pdfExtractor", "pdfExtractor", this.object)
+            //  game.settings.set("pdfExtractor", "pdfExtractor", this.object)
 
 
     }
@@ -114,7 +115,7 @@ export default class PDFExtractor extends FormApplication {
         let responses = 0
 
 
-        loadingTask.promise.then(async function (pdf) {
+        loadingTask.promise.then(async function(pdf) {
             let maxPage = pdf.numPages;
             //getting textContent by pages
             for (var j = 0; j <= maxPage - 1; j++) {
@@ -133,7 +134,7 @@ export default class PDFExtractor extends FormApplication {
                 for (let it of p.items) {
 
                     //unique content
-                    if (it.height != 0 && p.items[p.items.indexOf(it) - 1]?.str != it.str) {
+                    if (it.height != 0 && p.items[p.items.indexOf(it) - 1] ? .str != it.str) {
                         it.str = it.str.replace("�", "").replace("�", "");
                         it.numPage = i + 1
                         obj.contents.push(it)
@@ -158,7 +159,8 @@ export default class PDFExtractor extends FormApplication {
                     await game.settings.set("pdfExtractor", "pdfExtractor", mergeObject(game.settings.get("pdfExtractor", "pdfExtractor"), data))
 
                 }
-            } return this
+            }
+            return this
         }).then(this.render());
 
 
@@ -169,9 +171,9 @@ export default class PDFExtractor extends FormApplication {
     async renderPdf() {
         let activePage = this.activePage || 1;
         var loadingTask = pdfjsLib.getDocument(this.pdfUrl);
-        loadingTask.promise.then(async function (pdf) {
+        loadingTask.promise.then(async function(pdf) {
 
-            pdf.getPage(activePage).then(async function (page) {
+            pdf.getPage(activePage).then(async function(page) {
                 // you var scale = 1.5;
                 var viewport = page.getViewport({ scale: 0.9 });
                 // Support HiDPI-screens.
@@ -197,13 +199,13 @@ export default class PDFExtractor extends FormApplication {
                 let textContent = await page.getTextContent()
                 document.getElementById("text-layer").innerHTML = "";
                 textContent.items.forEach(it => {
-                    it.str = it.str.replace(String.fromCharCode(65533), "-")
-                    /*carCode=65533,
-                    for (var i = 0; i < it.str.length; i++) {
-                    }
-                    */
-                })
-                // Pass the data to the method for rendering of text over the pdf canvas.
+                        it.str = it.str.replace(String.fromCharCode(65533), "-")
+                            /*carCode=65533,
+                            for (var i = 0; i < it.str.length; i++) {
+                            }
+                            */
+                    })
+                    // Pass the data to the method for rendering of text over the pdf canvas.
                 pdfjsLib.renderTextLayer({
                     textContent: textContent,
                     container: $("#text-layer").get(0),
