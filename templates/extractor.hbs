@@ -9,26 +9,34 @@
     </style>
     <h3>{{pdfUrl}}</h3>
     <div class="flexrow">
+         <div class="flexrow">
+                <a id="pdfPrevious" <i class="far fa-caret-square-left"></i></a>
+                <div class="flexrow">
+                    <input type="number" id="activePage" name="activePage" value="{{activePage}}">
+                    /
+                    <input disabled type="number" id="maxPage" name="maxPage" value="{{maxPage}}">
+                </div>
+                <a id="pdfNext"><i class="far fa-caret-square-right"></i></a>
+            </div>
         <div class="form-fields">
             {{filePicker target="pdfUrl" }}
             <input type="text" id="pdfUrl" name="pdfUrl" placeholder="{{localize 'File Path'}}" value="{{pdfUrl}}" />
         </div>
+        
         <a id="scanPage">
             <i class="fab fa-searchengin"></i>scan
         </a>
 
     </div>
+
     <div class="flexrow">
         <div>
-            <div class="flexrow">
-                <a id="pdfPrevious" <i class="far fa-caret-square-left"></i></a>
-                <input type="number" id="activePage" name="activePage" value="{{activePage}}">
-                <a id="pdfNext"><i class="far fa-caret-square-right"></i></a>
-            </div>
+           
             <div id="pdfContainer">
                 <canvas id="pdf-canvas"></canvas>
                 <div id="text-layer"></div>
             </div>
+            
         </div>
         <ul>
             {{#each sizes as |size ind|}}
@@ -57,16 +65,11 @@
             {{/each}}
         </ul>
 
-    </div>
-    <div>
-        {{#each contents as |cont id|}}
-        <div>{{{cont.str}}}</div>
-        <h4>{{id}}</h4>
-        {{/each}}
-    </div>
+   
     <div id="htmlContent">
         {{{html}}}
+     </div>
+   
 
-    </div>
 
 </form>

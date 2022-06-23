@@ -22,7 +22,9 @@
     -webkit-user-select: textt!important;
     -moz-user-select: textt!important;
 }
-
+input[disabled]#maxPage{
+    color:black
+}
 #pdfContainer {
     position: relative;
     user-select: auto;

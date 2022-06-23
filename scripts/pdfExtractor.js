@@ -11,29 +11,36 @@ export default class PDFExtractor extends FormApplication {
         options.submitOnChange = true;
         options.closeOnSubmit = false;
         options.editable = true;
-        return options
+        return options;
     }
 
     constructor() {
 
         let data = super();
-        return mergeObject(data, game.settings.get("pdfExtractor", "pdfExtractor"))
+        return mergeObject(data, game.settings.get("pdfExtractor", "pdfExtractor"));
 
 
     }
 
 
     getData() {
-        const data = game.settings.get("pdfExtractor", "pdfExtractor")
+        const data = game.settings.get("pdfExtractor", "pdfExtractor");
 
         return mergeObject(super.getData(), data);
 
     }
 
     async _updateObject(event, formData) {
-        const data = expandObject(formData);
+        const data = {
+            activePage:this.activePage,
+            maxPage:this.maxPage,
+            pdfUrl:this.pdfUrl,
+            contents:this.contents,
+            sizes:this.sizes,
+            fonts:this.fonts
+        };
         await game.settings.set('pdfExtractor', 'pdfExtractor', data);
-        this.render();
+        
     }
     async activateListeners(html) {
 
@@ -43,12 +50,12 @@ export default class PDFExtractor extends FormApplication {
 
 
         let scanPage = html.find("#scanPage")[0];
-        scanPage.addEventListener("click", this.scanPage.bind(this))
+        scanPage.addEventListener("click", this.scanPage.bind(this));
 
         let pageInput = html.find("#activePage")[0];
-        pageInput.addEventListener("change", this.changePage.bind(this))
+        pageInput.addEventListener("change", this.changePage.bind(this));
         let prevBut = html.find("#pdfPrevious")[0];
-        prevBut.addEventListener("click", this.previous.bind(this))
+        prevBut.addEventListener("click", this.previous.bind(this));
         let nextBut = html.find("#pdfNext")[0];
         nextBut.addEventListener("click", this.nextPage.bind(this));
 
@@ -56,53 +63,55 @@ export default class PDFExtractor extends FormApplication {
         inputUrl.addEventListener("change", this.setPdfUrl.bind(this));
 
         let textLayer = html.find("#text-layer")[0];
-        textLayer.addEventListener("mouseup", this.getSelection.bind(this))
+        textLayer.addEventListener("mouseup", this.getSelection.bind(this));
 
 
 
         super.activateListeners(html);
+
+        //rendering pdf if already set
         if (this.pdfUrl) {
-            await this.renderPdf(this.object.pdfUrl)
+            await this.renderPdf(this.object.pdfUrl);
         }
 
     }
 
     getSelection(ev) {
         if (window.getSelection().toString().length > 0) {
-            let cont = document.getElementById('htmlContent').append(window.getSelection())
+            let cont = document.getElementById('htmlContent').append(window.getSelection());
         }
 
 
     }
 
     async setPdfUrl(ev) {
-        let obj = await game.settings.get("pdfExtractor", "pdfExtractor")
+        let obj = await game.settings.get("pdfExtractor", "pdfExtractor");
         obj.pdfUrl = document.getElementById('pdfUrl').value;
         this.pdfUrl = document.getElementById('pdfUrl').value;
-        await game.settings.set("pdfExtractor", "pdfExtractor", obj)
-        return this.renderPdf()
+        this.activePage=1;
+        document.getElementById('activePage').value=1;
+        this._updateObject();
+        return this.renderPdf();
 
     }
 
     async changePage(ev) {
         ev.preventDefault();
         this.activePage = parseInt(ev.currentTarget.value);
-        await this.renderPdf(this.pdfUrl)
-            //  game.settings.set("pdfExtractor", "pdfExtractor", this.object)
+        await this.renderPdf(this.pdfUrl);
 
 
     }
     nextPage(ev) {
 
         this.activePage++;
-        document.getElementById('activePage').value = this.activePage
-
-        this.renderPdf(this.pdfUrl)
+        document.getElementById('activePage').value = this.activePage;
+        this.renderPdf(this.pdfUrl);
     }
     previous(ev) {
         this.activePage--;
-        document.getElementById('activePage').value = this.activePage
-        this.renderPdf(this.pdfUrl)
+        document.getElementById('activePage').value = this.activePage;
+        this.renderPdf(this.pdfUrl);
     }
 
     async scanPage() {
@@ -112,7 +121,8 @@ export default class PDFExtractor extends FormApplication {
         obj.contents = [];
         obj.sizes = {};
         obj.pages = [];
-        let responses = 0
+        let responses = 0;
+        let structure=[];
 
 
         loadingTask.promise.then(async function(pdf) {
@@ -127,21 +137,44 @@ export default class PDFExtractor extends FormApplication {
                 let p = obj.pages[i];
                 for (let style in p.styles) {
                     if (!obj.fonts[style]) {
-                        let s = p.styles[style]
-                        obj.fonts[style] = s
+                        let s = p.styles[style];
+                        obj.fonts[style] = s;
                     }
                 }
                 for (let it of p.items) {
 
                     //unique content
-                    if (it.height != 0 && p.items[p.items.indexOf(it) - 1] ? .str != it.str) {
-                        it.str = it.str.replace("�", "").replace("�", "");
-                        it.numPage = i + 1
-                        obj.contents.push(it)
+                    if (it.height != 0 && p.items[p.items.indexOf(it) - 1] ?.str != it.str ) {
+                        it.str = it.str.replace(String.fromCharCode(65533), "");
+                        it.numPage = i + 1;
+                        obj.contents.push(it);
                         if (!obj.sizes[it.height]) {
                             obj.sizes[it.height] = {
                                 tag: "truc"
+                            };
+                        }
+                        //defining journals structure
+
+                        //chapters
+                        if ((it.height==70||it.height>35)&& it.str.length>3){
+                            if (structure.filter(c=>c.numPage==it.numPage).length==0){
+                                 structure[structure.length]=new Chapter(it);
                             }
+                           else if (structure.filter(c=>c.numPage==it.numPage).length>0){
+                            structure[structure.indexOf(structure.filter(c=>c.numPage==it.numPage)[0])].label+=" "+it.str;
+                           }
+                        }
+                        structure=structure.sort((a,b)=>{
+                            return  a.item.numPage-b.item.numPage;
+                         });
+                         if (it.height==18 && !parseInt(it.str) &&!it.str.toLowerCase().includes("chapitre")){
+                            console.log(it)
+                            structure.filter(c=>c.numPage<=it.numPage)[structure.filter(c=>c.numPage<=it.numPage).length-1].sections.push(new Section(it))
+                          console.log( structure.filter(c=>c.numPage<=it.numPage)[structure.filter(c=>c.numPage<=it.numPage).length-1])
+
+                        }
+                         if (it.height==10 || (it.height>39 && it.height<41)){
+
                         }
                     }
 
@@ -155,13 +188,14 @@ export default class PDFExtractor extends FormApplication {
                         sizes: obj.sizes,
                         contents: obj.contents,
 
-                    }
-                    await game.settings.set("pdfExtractor", "pdfExtractor", mergeObject(game.settings.get("pdfExtractor", "pdfExtractor"), data))
+                    };
+                    await game.settings.set("pdfExtractor", "pdfExtractor", mergeObject(game.settings.get("pdfExtractor", "pdfExtractor"), data));
 
                 }
             }
-            return this
-        }).then(this.render());
+          
+            structure.forEach(t=>{console.log(t);});
+        }).then(this._updateObject()).then(this.render());
 
 
     }
@@ -170,8 +204,10 @@ export default class PDFExtractor extends FormApplication {
 
     async renderPdf() {
         let activePage = this.activePage || 1;
+        let maxPage=0;
         var loadingTask = pdfjsLib.getDocument(this.pdfUrl);
-        loadingTask.promise.then(async function(pdf) {
+        await loadingTask.promise.then(async function(pdf) {
+            maxPage=pdf.numPages;
 
             pdf.getPage(activePage).then(async function(page) {
                 // you var scale = 1.5;
@@ -195,16 +231,10 @@ export default class PDFExtractor extends FormApplication {
                     transform: transform,
                     viewport: viewport
                 };
-                await page.render(renderContext)
-                let textContent = await page.getTextContent()
+                await page.render(renderContext);
+                let textContent = await page.getTextContent();
                 document.getElementById("text-layer").innerHTML = "";
-                textContent.items.forEach(it => {
-                        it.str = it.str.replace(String.fromCharCode(65533), "-")
-                            /*carCode=65533,
-                            for (var i = 0; i < it.str.length; i++) {
-                            }
-                            */
-                    })
+               
                     // Pass the data to the method for rendering of text over the pdf canvas.
                 pdfjsLib.renderTextLayer({
                     textContent: textContent,
@@ -217,8 +247,27 @@ export default class PDFExtractor extends FormApplication {
             });
 
         });
+        this.maxPage=maxPage;
+        this._updateObject();
 
     }
 
 
+}
+
+class Chapter{
+    constructor(it){
+        this.item=it;
+        this.label=it.str.toUpperCase();
+        this.numPage=it.numPage;
+        this.sections=[];
+    }
+}
+
+class Section{
+    constructor(it){
+        this.item=it;
+        this.label=it.str.toUpperCase();
+        this.numPage=it.numPage;
+    }
 }
