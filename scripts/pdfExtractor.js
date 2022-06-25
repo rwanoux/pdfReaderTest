@@ -44,13 +44,11 @@ export default class PDFExtractor extends FormApplication {
     }
     async activateListeners(html) {
 
-
-
-
-
-
-        let scanPage = html.find("#scanPage")[0];
-        scanPage.addEventListener("click", this.scanPage.bind(this));
+        //custom listenners
+        /*
+        let scanPdf = html.find("#scanPdf")[0];
+        scanPdf.addEventListener("click", this._onscanPdf.bind(this));
+        */
         let createBut = html.find("#createJournal")[0];
         createBut.addEventListener("click", this.createJournal.bind(this));
 
@@ -68,7 +66,7 @@ export default class PDFExtractor extends FormApplication {
         textLayer.addEventListener("mouseup", this.getSelection.bind(this));
 
 
-
+        //formApplication listenners
         super.activateListeners(html);
 
         //rendering pdf if already set
@@ -102,70 +100,158 @@ export default class PDFExtractor extends FormApplication {
 
 
     }
-    async createJournal(ev) {
-        for (let i = 0; i < this.contents.length - 1; i++) {
-            let cont = this.contents[i];
 
-            if (cont.role == "chapter") {
-                //if multi line chapter name : updating folder and journal with concat
-                if (this.contents[i - 1]?.role == "chapter") {
-                    console.log(this.contents[i - 1].str, cont)
-                    let oldName = game.journal.filter(j => j.name.includes(this.contents[i - 1].str))[0].name;
-                    let newName = oldName + " " + cont.str;
 
-                    await game.journal.getName(oldName).update({
-                        name: newName
-                    });
-                    await game.folders.getName(oldName).update({
-                        name: newName
-                    });
+    async createChapters() {
+
+
+        let chapterList = this.contents.filter(c => c.role == "chapter");
+        for (let i = 0; i < chapterList.length - 1; i++) {
+            let cont = chapterList[i];
+            let actualPage = cont.numPage;
+
+
+            //concat chapter names depending if multiple chapters in same page
+            let siblingContents = chapterList.filter(ct => ct.numPage == actualPage);
+            let chapterName = "";
+            if (siblingContents.length > 1) {
+                chapterName = siblingContents.reduce(function (ac, a, index, array) {
+                    return ac + " " + a.str;
+                }, " ");
+            }
+            else {
+                chapterName = cont.str;
+            }
+            //deleting space characters 
+            for (let l of chapterName) {
+                if (chapterName.startsWith(" ")) {
+                    chapterName = chapterName.substring(1);
                 }
-                // else =>first line chapter label : creating journal and folder
-                else {
-                    let jFolder = ui.journal.folders.filter(f => f.name == cont.str)[0];
-                    if (!jFolder) {
-                        jFolder = await Folder.create({
-                            name: cont.str,
-                            type: "JournalEntry",
-                            sort: i
-                        });
-                        let data = {
-                            "name": cont.str,
-                            "folder": jFolder.id
-                        };
-                        await JournalEntry.create(
-                            data
-                        );
+            }
+
+
+            let jFolder = ui.journal.folders.find(f => f.name == chapterName);
+            if (!jFolder) {
+                jFolder = await Folder.create({
+                    name: chapterName,
+                    type: "JournalEntry",
+                    sort: i,
+                    flags: {
+                        pdfExtractor: {
+                            sourcePage: actualPage
+                        }
+                    },
+                    sorting: "m"
+                });
+
+                //creating journal with same name as folder for indexing sections and storing content before first section
+                let data = {
+                    "name": chapterName,
+                    "folder": jFolder.id,
+                    sort: this.contents.filter(c => c.role == "chapter").indexOf(cont)
+                };
+                await JournalEntry.create(
+                    data
+                );
+            }
+
+        }
+
+    }
+    async createSections() {
+        let sectionList = this.contents.filter(c => c.role == "section");
+        for (let i = 0; i < sectionList.length - 1; i++) {
+            let section = sectionList[i];
+            let actualPage = sectionList[i].numPage;
+
+            let siblingContents = sectionList.filter(ct => ct.numPage == actualPage);
+            let sectionName = "";
+
+
+            if (siblingContents.length > 1) {
+                sectionName = siblingContents.reduce(function (ac, a, index, array) {
+                    return ac + " " + a.str;
+                }, " ");
+            }
+            else {
+                sectionName = section.str;
+            }
+            //deleting space characters 
+            for (let l of sectionName) {
+                if (sectionName.startsWith(" ")) {
+                    sectionName = sectionName.substring(1);
+                }
+            }
+            if (!game.journal.getName(sectionName)) {
+                //ordering chapters by sourcePage
+
+                let previousChapters = game.folders.filter(fold => fold.data.flags.pdfExtractor?.sourcePage <= actualPage).sort((a, b) => {
+                    if (a.data.flags.pdfExtractor.sourcePage < b.data.flags.pdfExtractor.sourcePage) {
+                        return -1;
                     }
+                    if (a.data.flags.pdfExtractor.sourcePage > b.data.flags.pdfExtractor.sourcePage) {
+                        return 1;
+                    }
+                    return 0;
+                });
 
+                if (previousChapters.length > 0) {
+                    let lastChapter = previousChapters[previousChapters.length - 1];
+                    await JournalEntry.create({
+                        name: sectionName,
+                        folder: lastChapter.id,
+                        flags: {
+                            pdfExtractor: {
+                                sourcePage: actualPage
+                            }
+                        },
+                        sort: i
+                    });
                 }
-            }
-            if (cont.role == "section") {
-
-                let previousChapter = this.contents.filter(c => c.role == "chapter" && this.contents.indexOf(c) <= this.contents.indexOf(cont))
-                let lastChapterName = game.folders.filter(f => f.name.includes(previousChapter[previousChapter.length - 1].str))[0].name;
-                console.log(lastChapterName);
-                JournalEntry.create({
-                    name: cont.str,
-                    folder: game.folders.getName(lastChapterName).id,
-                    sort: game.journal.filter(j => j.folder?.name == lastChapterName).length
-                })
-
-            }
-            if (cont.role == "paragraphe") {
 
             }
 
         }
+        console.log(sectionList);
+    }
+    async createJournal(ev) {
+
+        await this.createChapters();
+        await this.createSections();
+        /*
+                for (let i = 0; i < this.contents.length - 1; i++) {
+                    let cont = this.contents[i];
+        
+        
+                    if (cont.role == "section") {
+        
+                        let previousChapter = this.contents.filter(c => c.role == "chapter" && this.contents.indexOf(c) <= this.contents.indexOf(cont));
+                        let lastChapterName = game.folders.filter(f => f.name.includes(previousChapter[previousChapter.length - 1].str))[0].name;
+                        console.log(lastChapterName);
+                        JournalEntry.create({
+                            name: cont.str,
+                            folder: game.folders.getName(lastChapterName).id,
+                            sort: this.contents.filter(c => c.role == "section").indexOf(cont)
+        
+                        });
+        
+                    }
+                    if (cont.role == "paragraphe") {
+        
+                    }
+        
+                }*/
     }
     async setPdfUrl(ev) {
-        let obj = await game.settings.get("pdfExtractor", "pdfExtractor");
-        obj.pdfUrl = document.getElementById('pdfUrl').value;
+        this.createLoading();
         this.pdfUrl = document.getElementById('pdfUrl').value;
         this.activePage = 1;
+        await this._updateObject();
         document.getElementById('activePage').value = 1;
-        this._updateObject();
-        return this.renderPdf();
+
+        await this.renderPdf();
+        await this.scanPdf();
+        this.deleteLoading();
 
     }
 
@@ -174,6 +260,17 @@ export default class PDFExtractor extends FormApplication {
         this.activePage = parseInt(ev.currentTarget.value);
         await this.renderPdf(this.pdfUrl);
 
+
+    }
+    createLoading() {
+        let loadingDiv = document.createElement('div');
+        loadingDiv.id = "pdfLoading";
+        loadingDiv.innerHTML = '<div><i class="fas fa-pray"></i><i class="fas fa-spinner"></i><div>';
+        document.body.append(loadingDiv)
+    }
+    deleteLoading() {
+        let loadingDiv = document.getElementById('pdfLoading');
+        if (loadingDiv) { document.body.removeChild(loadingDiv); }
 
     }
     nextPage(ev) {
@@ -187,8 +284,12 @@ export default class PDFExtractor extends FormApplication {
         document.getElementById('activePage').value = this.activePage;
         this.renderPdf(this.pdfUrl);
     }
+    async _onscanPdf() {
+        await this.scanPdf();
+        await this._updateObject()
 
-    async scanPage() {
+    }
+    async scanPdf() {
         let obj = this;
         var loadingTask = await pdfjsLib.getDocument(this.pdfUrl);
         obj.fonts = {};
@@ -197,7 +298,9 @@ export default class PDFExtractor extends FormApplication {
         obj.pages = [];
         let responses = 0;
         let structure = [];
-
+        if (!document.getElementById("pdfLoading")) {
+            this.createLoading();
+        }
 
         loadingTask.promise.then(async function (pdf) {
             let maxPage = pdf.numPages;
@@ -209,25 +312,32 @@ export default class PDFExtractor extends FormApplication {
 
             for (let i = 0; i < obj.pages.length; i++) {
                 let p = obj.pages[i];
-                i == 40 ? console.log(p) : console.log("not");
+
+
+                //getting fonts in pages =>storing in this.fonts
                 for (let style in p.styles) {
                     if (!obj.fonts[style]) {
                         let s = p.styles[style];
                         obj.fonts[style] = s;
                     }
                 }
-                for (let it of p.items) {
 
-                    //cleaning doubled
 
+                for (let itemIndex = 0; itemIndex < p.items.length; itemIndex++) {
+                    let it = p.items[itemIndex]
+                    it.numPage = i + 1;
+
+                    /*
+                    //removing empty items
+                    if (it.heigth == 0 || it.width == 0 || it.str == "") {
+                        p.items.splice(obj.contents[it], 1);
+                        break;
+                    }
+*/
                     if (it.height != 0 && p.items[p.items.indexOf(it) - 1]?.str != it.str) {
 
-                        // cleaning unknown charcode
-                        it.str = it.str.replace(String.fromCharCode(65533), "");
-                        it.numPage = i + 1;
-                        obj.contents.push(it);
-                        if (!obj.sizes[it.height.toString().replace(".", ",")]) {
-                            obj.sizes[it.height.toString().replace(".", ",")] = {
+                        if (!obj.sizes[it.height.toFixed().toString().replace(".", ",")]) {
+                            obj.sizes[it.height.toFixed().toString().replace(".", ",")] = {
                                 tag: "truc"
                             };
                         }
@@ -254,31 +364,44 @@ export default class PDFExtractor extends FormApplication {
                     }
 
 
-                }
-                let cleanContents = obj.contents.filter((ele, pos) => obj.contents.indexOf(ele) == pos);
+                    //filtering unecessary textItems
+                    if (it.height != 0 && it.width != 0 && it.str != "") {
+                        obj.contents.push(it);
+                    }
 
+
+                }
 
                 if (i == obj.pages.length - 1) {
-                    let data = {
-                        fonts: obj.fonts,
-                        sizes: obj.sizes,
-                        contents: obj.contents,
+                    ui.pdfExtractor.fonts = obj.fonts;
+                    ui.pdfExtractor.sizes = obj.sizes;
+                    ui.pdfExtractor.contents = obj.contents;
+                    ui.pdfExtractor.objects = p.commonObjects;
 
-                    };
-                    await game.settings.set("pdfExtractor", "pdfExtractor", mergeObject(game.settings.get("pdfExtractor", "pdfExtractor"), data));
+
+                    await ui.pdfExtractor._updateObject();
+                    ui.pdfExtractor.close();
+                    ui.pdfExtractor.render(true);
 
                 }
+
             }
 
             structure.forEach(t => { console.log(t); });
-        }).then(this._updateObject()).then(this.render()).then(console.log("______________scan done_______"));
 
+        });
 
+        if (document.getElementById("pdfLoading")) {
+            this.deleteLoading();
+        }
     }
 
 
 
     async renderPdf() {
+        if (!document.getElementById("pdfLoading")) {
+            this.createLoading();
+        }
         let activePage = this.activePage || 1;
         let maxPage = 0;
         var loadingTask = pdfjsLib.getDocument(this.pdfUrl);
@@ -324,7 +447,9 @@ export default class PDFExtractor extends FormApplication {
 
         });
         this.maxPage = maxPage;
-        this._updateObject();
+        if (document.getElementById("pdfLoading")) {
+            this.deleteLoading();
+        }
 
     }
 

@@ -8,9 +8,9 @@
     line-height: 1.0;
     color: rgba(0, 0, 0, 0.267);
     cursor: text;
-    user-select: text!important;
-    -webkit-user-select: textt!important;
-    -moz-user-select: textt!important;
+    user-select: text !important;
+    -webkit-user-select: textt !important;
+    -moz-user-select: textt !important;
 }
 
 #text-layer>span {
@@ -18,15 +18,52 @@
     position: absolute;
     cursor: text;
     transform-origin: 0% 0%;
-    user-select: text!important;
-    -webkit-user-select: textt!important;
-    -moz-user-select: textt!important;
+    user-select: text !important;
+    -webkit-user-select: textt !important;
+    -moz-user-select: textt !important;
 }
-input[disabled]#maxPage{
-    color:black
+
+input[disabled]#maxPage {
+    color: black
 }
+
 #pdfContainer {
     position: relative;
     user-select: auto;
     resize: both;
+}
+
+@keyframes rotation {
+    from {
+        transform: rotateZ(0deg);
+    }
+
+    to {
+        transform: rotateZ(359deg);
+    }
+}
+
+#pdfLoading {
+    position: fixed;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.26);
+    color: aliceblue;
+    text-shadow: 0px 0px 20px black;
+    z-index: 6000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+}
+
+#pdfLoading i {
+    font-size: 156px;
+    margin-right: 60px;
+}
+
+#pdfLoading i.fa-spinner {
+    font-size: 306px;
+
+    animation: rotation 2s infinite linear;
 }
