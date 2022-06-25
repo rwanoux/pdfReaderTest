@@ -1,7 +1,11 @@
 import PDFExtractor from "./pdfExtractor.js";
 
 pdfjsLib.workerSrc = '../pdfjs/build/pdf.worker.js';
-Hooks.once('init', async function() {
+pdfjsLib.disableWorker = true;
+pdfjsLib.disableFontFace = true;
+
+
+Hooks.once('init', async function () {
     game.settings.register('pdfExtractor', 'pdfExtractor', {
         scope: 'world',
         config: false,
@@ -21,7 +25,7 @@ Hooks.once('init', async function() {
 });
 
 
-Hooks.once('ready', async function() {
+Hooks.once('ready', async function () {
     ui.pdfExtractor = new PDFExtractor();
 
 });

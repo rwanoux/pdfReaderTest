@@ -80,9 +80,25 @@ export default class PDFExtractor extends FormApplication {
     }
 
     getSelection(ev) {
+
         if (window.getSelection().toString().length > 0) {
-            let cont = document.getElementById('htmlContent').append(window.getSelection());
+
+            let nodeList = [];
+            for (let node of document.getElementById('text-layer').children) {
+                if (window.getSelection().toString().includes(node.innerHTML) && node.tagName != "br") {
+                    nodeList.push(node.cloneNode());
+                }
+            }
+            for (let node of nodeList) {
+                document.getElementById('htmlContent').append(node);
+            }
+            var selObj = window.getSelection();
+            alert(selObj);
+            var selRange = selObj.getRangeAt(0);
+            document.getElementById('htmlContent').append(selRange);
+            // let cont = document.getElementById('htmlContent').append(window.getSelection());
         }
+
 
 
     }
@@ -125,9 +141,15 @@ export default class PDFExtractor extends FormApplication {
                 }
             }
             if (cont.role == "section") {
+
                 let previousChapter = this.contents.filter(c => c.role == "chapter" && this.contents.indexOf(c) <= this.contents.indexOf(cont))
-                let lastChapterName = game.folders.filter(f => f.name.includes(previousChapter[previousChapter.length - 1].str));
+                let lastChapterName = game.folders.filter(f => f.name.includes(previousChapter[previousChapter.length - 1].str))[0].name;
                 console.log(lastChapterName);
+                JournalEntry.create({
+                    name: cont.str,
+                    folder: game.folders.getName(lastChapterName).id,
+                    sort: game.journal.filter(j => j.folder?.name == lastChapterName).length
+                })
 
             }
             if (cont.role == "paragraphe") {
@@ -187,6 +209,7 @@ export default class PDFExtractor extends FormApplication {
 
             for (let i = 0; i < obj.pages.length; i++) {
                 let p = obj.pages[i];
+                i == 40 ? console.log(p) : console.log("not");
                 for (let style in p.styles) {
                     if (!obj.fonts[style]) {
                         let s = p.styles[style];
