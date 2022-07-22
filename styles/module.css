@@ -7,10 +7,8 @@
     opacity: 1;
     line-height: 1.0;
     color: rgba(0, 0, 0, 0.267);
-    cursor: text;
-    user-select: text !important;
-    -webkit-user-select: textt !important;
-    -moz-user-select: textt !important;
+
+
 }
 
 #text-layer>span {
@@ -47,7 +45,7 @@ input[disabled]#maxPage {
     position: fixed;
     width: 100vw;
     height: 100vh;
-    background-color: rgba(0, 0, 0, 0.26);
+    background-color: rgba(0, 0, 0, 0.496);
     color: aliceblue;
     text-shadow: 0px 0px 20px black;
     z-index: 6000;

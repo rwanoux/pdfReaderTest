@@ -3,7 +3,7 @@ export default class PDFExtractor extends FormApplication {
     static get defaultOptions() {
         const options = super.defaultOptions;
         options.template = "modules/pdfReaderTest/templates/extractor.hbs";
-        options.width = 1550;
+        options.width = 800;
         options.height = 920;
         options.left = 80;
         options.title = "pdf extractor";
@@ -17,6 +17,10 @@ export default class PDFExtractor extends FormApplication {
     constructor() {
 
         let data = super();
+        data.openActors = [];
+        data.openItems = [];
+        data.openJournals = [];
+
         return mergeObject(data, game.settings.get("pdfExtractor", "pdfExtractor"));
 
 
@@ -54,20 +58,54 @@ export default class PDFExtractor extends FormApplication {
 
         let pageInput = html.find("#activePage")[0];
         pageInput.addEventListener("change", this.changePage.bind(this));
+
         let prevBut = html.find("#pdfPrevious")[0];
         prevBut.addEventListener("click", this.previous.bind(this));
+
         let nextBut = html.find("#pdfNext")[0];
         nextBut.addEventListener("click", this.nextPage.bind(this));
+
 
         let inputUrl = html.find("#pdfUrl")[0];
         inputUrl.addEventListener("change", this.setPdfUrl.bind(this));
 
         let textLayer = html.find("#text-layer")[0];
-        textLayer.addEventListener("mouseup", this.getSelection.bind(this));
+        textLayer.addEventListener("mouseup", this._onSelection.bind(this));
 
 
         //formApplication listenners
         super.activateListeners(html);
+
+        // getting 
+        Hooks.on('renderActorSheet', async function (app, html, sheetData) {
+            if (!ui.pdfExtractor.openActors.some(act => act == sheetData.item.id)) {
+                ui.pdfExtractor.openActors.push(sheetData.actor.id);
+
+            }
+
+        });
+        Hooks.on('renderItemSheet', async function (app, html, sheetData) {
+            if (!ui.pdfExtractor.openItems.some(it => it == sheetData.item.id)) {
+                ui.pdfExtractor.openItems.push(sheetData.item.id);
+            }
+
+        });
+        Hooks.on('renderJournalSheet', async function (app, html, sheetData) {
+            if (!ui.pdfExtractor.openJournals.some(j => j == sheetData.document.id)) {
+                ui.pdfExtractor.openItems.push(sheetData.document.id);
+            }
+
+        });
+        Hooks.on('closeActorSheet', async function (app, html) {
+            ui.pdfExtractor.openActors = [];
+        });
+        Hooks.on('closeJournalSheet', async function (app, html) {
+            ui.pdfExtractor.openJournals = [];
+        });
+        Hooks.on('closeItemSheet', async function (app, html) {
+            ui.pdfExtractor.openItems = [];
+        });
+
 
         //rendering pdf if already set
         if (this.pdfUrl) {
@@ -76,30 +114,218 @@ export default class PDFExtractor extends FormApplication {
 
 
     }
+    async _onSelection(ev) {
+        if (window.getSelection().toString().length > 0) {
 
-    getSelection(ev) {
+            let entityChoices = [];
+            for (let key of game.system.documentTypes.Actor) {
+                entityChoices.push(key);
+            }
+            for (let key of game.system.documentTypes.Item) {
+                entityChoices.push(key);
+            }
+            entityChoices.push("JournalEntry");
+
+
+            let butts = {};
+            for (let choice of entityChoices) {
+                butts[choice] = {
+                    label: choice,
+
+                    callback: () => {
+                        ui.pdfExtractor.createEntity(choice);
+                    }
+
+                };
+            }
+            let d = new Dialog({
+                title: "fill entity",
+                content: "choose the entity you want to create",
+                buttons: butts
+            }, {
+                left: 100,
+                top: 100,
+                resizable: true
+            });
+            d.render(true);
+        }
+
+    }
+    async createEntity(type) {
+        switch (type) {
+            case "stormknight":
+                await Actor.create({ name: "new", type: stormknight });
+                break;
+            case "JournalEntry":
+                let content = await ui.pdfExtractor.getSelection();
+                console.log(content)
+                await ui.pdfExtractor.createJournal(content);
+                break;
+            default:
+                let el = await ui.pdfExtractor.getSelection();
+                let text = el.innerText
+                for (let i = 0; i < text.length; i++) {
+                    let car = text[i]
+                    console.log(`
+                    the __ ${car}
+                    has code ${car.charCodeAt(0)}
+                    `)
+                }
+        }
+    }
+
+
+    async getSelection() {
+        //if some text is selected 
 
         if (window.getSelection().toString().length > 0) {
 
-            let nodeList = [];
-            for (let node of document.getElementById('text-layer').children) {
-                if (window.getSelection().toString().includes(node.innerHTML) && node.tagName != "br") {
-                    nodeList.push(node.cloneNode());
+
+            // selected html elements
+
+            let firtsNode = window.getSelection().anchorNode.parentNode;
+            let lastNode = window.getSelection().focusNode.parentNode;
+            let parent = firtsNode.parentNode;
+
+
+            // html collection to array 
+            let content = [].slice.call(parent.children);
+            content = content.slice(content.indexOf(firtsNode), content.indexOf(lastNode) + 1);
+
+            //new empty array to store elements
+            let entityContent = [];
+
+            // creating a div in order to grab inner html
+            let d = document.createElement("div");
+
+
+            console.log(content)
+
+            // cleaning original content, deleting linebreak and empty span
+            for (let node of content) {
+                console.log(node.innerText)
+                if (node.innerText) {
+                    console.log('OLD_____________' + node.innerText);
+                    node.innerText = node.innerText.replaceAll(/\n/g, "<br/>").replaceAll("�", `.
+                    `);
+                    console.log('NEW_____________' + node.innerText);
+
+                    if (node.innerText == " " || node.tagName == "BR") {
+                        if (content[content.indexOf(node) - 1]) {
+                            content[content.indexOf(node) - 1].innerText += " ";
+                        }
+                        content.splice(content.indexOf(node), 1);
+                    }
+
+
+                    //adding space between spans
+
+                    if (node.innerText.endsWith(" ") && content[content.indexOf(node) - 1]?.innerText.startsWith(" ")) {
+                        node.innerText = node.innerText.substring(1);
+                    }
+                    console.log(node.innerText);
+                } else {
+                    content.splice(content.indexOf(node), 1);
                 }
-            }
-            for (let node of nodeList) {
-                document.getElementById('htmlContent').append(node);
-            }
-            var selObj = window.getSelection();
-            alert(selObj);
-            var selRange = selObj.getRangeAt(0);
-            document.getElementById('htmlContent').append(selRange);
-            // let cont = document.getElementById('htmlContent').append(window.getSelection());
+
+            };
+
+
+
+            content.forEach(node => {
+
+                let newNode = node.cloneNode(true);
+
+                if (newNode.style.fontSize == "10px") {
+                    entityContent[content.indexOf(node)] = newNode;
+                }
+
+                else if (newNode.style.fontSize == "9.8px" || newNode.style.fontSize == "14px") {
+                    let title = document.createElement("h3");
+                    if (newNode.innerText == content[content.indexOf(node) + 1]?.innerText) {
+                        title = document.createElement("h2")
+                    }
+                    if (newNode.hasAttributes()) {
+                        for (let i = 0; i < newNode.attributes.length; i++) {
+                            title.setAttribute(newNode.attributes[i].name, newNode.attributes[i].value);
+                        }
+                    }
+                    title.innerText = newNode.innerText.toUpperCase();
+
+                    entityContent[content.indexOf(node)] = title;
+                }
+                else if (newNode.style.fontSize == "18px") {
+                    let title = document.createElement("h1");
+                    if (newNode.hasAttributes()) {
+                        for (let i = 0; i < newNode.attributes.length; i++) {
+                            title.setAttribute(newNode.attributes[i].name, newNode.attributes[i].value);
+                        }
+                    }
+                    title.innerText = newNode.innerText;
+
+                    entityContent[content.indexOf(node)] = title;
+                }
+
+            });
+            // concatening same elements
+            entityContent.forEach(node => {
+
+
+                if (entityContent.indexOf(node) > 0) {
+                    if (node.tagName === (entityContent[entityContent.indexOf(node) - 1])?.tagName) {
+                        for (let i = entityContent.indexOf(node) - 1; i >= 0; i--) {
+                            if (!entityContent[i].getAttribute("data-doubled")) {
+                                if (entityContent[i].innerHTML != node.innerHTML) {
+                                    if (entityContent[i].innerHTML.length > 1) {
+                                        entityContent[i].innerHTML += " " + node.innerHTML;
+                                    } else {
+                                        entityContent[i].innerHTML += node.innerHTML;
+                                    }
+
+                                }
+
+                                i = 0;
+                            }
+                        }
+
+
+                        node.setAttribute("data-doubled", true);
+                    }
+                }
+
+
+
+            });
+
+
+            entityContent.forEach(node => {
+                if (!node.getAttribute("data-doubled")) {
+                    node.removeAttribute("style");
+
+                    d.append(node);
+                }
+
+
+            });
+            window.getSelection().empty();
+
+            return d;
         }
-
-
-
     }
+
+
+    async createJournal(element) {
+        let j = await JournalEntry.create({
+            content: element.innerHTML.replaceAll("�", ".").replaceAll("•", '<br/>•'),
+            name: "new Journal"
+        });
+
+        j.sheet.render(true);
+    }
+
+
+
+
 
 
     async createChapters() {
@@ -212,36 +438,9 @@ export default class PDFExtractor extends FormApplication {
             }
 
         }
-        console.log(sectionList);
     }
-    async createJournal(ev) {
 
-        await this.createChapters();
-        await this.createSections();
-        /*
-                for (let i = 0; i < this.contents.length - 1; i++) {
-                    let cont = this.contents[i];
-        
-        
-                    if (cont.role == "section") {
-        
-                        let previousChapter = this.contents.filter(c => c.role == "chapter" && this.contents.indexOf(c) <= this.contents.indexOf(cont));
-                        let lastChapterName = game.folders.filter(f => f.name.includes(previousChapter[previousChapter.length - 1].str))[0].name;
-                        console.log(lastChapterName);
-                        JournalEntry.create({
-                            name: cont.str,
-                            folder: game.folders.getName(lastChapterName).id,
-                            sort: this.contents.filter(c => c.role == "section").indexOf(cont)
-        
-                        });
-        
-                    }
-                    if (cont.role == "paragraphe") {
-        
-                    }
-        
-                }*/
-    }
+
     async setPdfUrl(ev) {
         this.createLoading();
         this.pdfUrl = document.getElementById('pdfUrl').value;
@@ -256,8 +455,13 @@ export default class PDFExtractor extends FormApplication {
     }
 
     async changePage(ev) {
+
         ev.preventDefault();
         this.activePage = parseInt(ev.currentTarget.value);
+        if (this.activepage > this.maxPage) { this.activePage = this.maxPage; }
+
+        ev.currentTarget.value = this.activePage;
+
         await this.renderPdf(this.pdfUrl);
 
 
@@ -266,7 +470,7 @@ export default class PDFExtractor extends FormApplication {
         let loadingDiv = document.createElement('div');
         loadingDiv.id = "pdfLoading";
         loadingDiv.innerHTML = '<div><i class="fas fa-pray"></i><i class="fas fa-spinner"></i><div>';
-        document.body.append(loadingDiv)
+        document.body.append(loadingDiv);
     }
     deleteLoading() {
         let loadingDiv = document.getElementById('pdfLoading');
@@ -286,7 +490,7 @@ export default class PDFExtractor extends FormApplication {
     }
     async _onscanPdf() {
         await this.scanPdf();
-        await this._updateObject()
+        await this._updateObject();
 
     }
     async scanPdf() {
@@ -324,16 +528,10 @@ export default class PDFExtractor extends FormApplication {
 
 
                 for (let itemIndex = 0; itemIndex < p.items.length; itemIndex++) {
-                    let it = p.items[itemIndex]
+                    let it = p.items[itemIndex];
                     it.numPage = i + 1;
 
-                    /*
-                    //removing empty items
-                    if (it.heigth == 0 || it.width == 0 || it.str == "") {
-                        p.items.splice(obj.contents[it], 1);
-                        break;
-                    }
-*/
+
                     if (it.height != 0 && p.items[p.items.indexOf(it) - 1]?.str != it.str) {
 
                         if (!obj.sizes[it.height.toFixed().toString().replace(".", ",")]) {
@@ -380,20 +578,19 @@ export default class PDFExtractor extends FormApplication {
 
 
                     await ui.pdfExtractor._updateObject();
-                    ui.pdfExtractor.close();
-                    ui.pdfExtractor.render(true);
 
+                    ui.pdfExtractor.render(true);
+                    if (document.getElementById("pdfLoading")) {
+                        ui.pdfExtractor.deleteLoading();
+                    }
                 }
 
             }
 
-            structure.forEach(t => { console.log(t); });
 
         });
 
-        if (document.getElementById("pdfLoading")) {
-            this.deleteLoading();
-        }
+
     }
 
 
@@ -409,8 +606,10 @@ export default class PDFExtractor extends FormApplication {
             maxPage = pdf.numPages;
 
             pdf.getPage(activePage).then(async function (page) {
+
+
                 // you var scale = 1.5;
-                var viewport = page.getViewport({ scale: 0.9 });
+                var viewport = page.getViewport({ scale: 1 });
                 // Support HiDPI-screens.
                 var outputScale = window.devicePixelRatio || 1;
 
@@ -445,12 +644,12 @@ export default class PDFExtractor extends FormApplication {
 
             });
 
+
         });
         this.maxPage = maxPage;
         if (document.getElementById("pdfLoading")) {
-            this.deleteLoading();
+            ui.pdfExtractor.deleteLoading();
         }
-
     }
 
 
