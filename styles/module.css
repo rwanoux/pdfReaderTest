@@ -11,10 +11,11 @@
 
 }
 
-#text-layer>span {
-    color: transparent;
+#textLayer span {
+    color: red;
     position: absolute;
     cursor: text;
+    opacity:1;
     transform-origin: 0% 0%;
     user-select: text !important;
     -webkit-user-select: textt !important;
@@ -64,4 +65,9 @@ input[disabled]#maxPage {
     font-size: 306px;
 
     animation: rotation 2s infinite linear;
+}
+
+#pdfReader {
+    width: 100%;
+    height: 100%;
 }
