@@ -15,7 +15,7 @@
     color: red;
     position: absolute;
     cursor: text;
-    opacity:1;
+    opacity: 1;
     transform-origin: 0% 0%;
     user-select: text !important;
     -webkit-user-select: textt !important;
@@ -69,5 +69,12 @@ input[disabled]#maxPage {
 
 #pdfReader {
     width: 100%;
-    height: 100%;
+    height: 90%;
+}
+
+a#createJournal {
+    text-align: center;
+    border: 1px solid white;
+    margin: 5px;
+    padding-top: 10px;
 }

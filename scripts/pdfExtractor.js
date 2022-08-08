@@ -69,12 +69,15 @@ export default class PDFExtractor extends FormApplication {
         inputUrl.addEventListener("change", this.setPdfUrl.bind(this));
 
         let iframe = html.find("#pdfReader")[0];
-        console.log(iframe);
-        iframe.addEventListener("load", this.onFrameLoaded.bind(this))
+        iframe.contentWindow.addEventListener("load", this.onFrameLoaded.bind(this))
+
 
         let createBut = html.find("#createJournal")[0];
-        createBut.addEventListener("click", this.getTree.bind(this));
+        createBut.addEventListener("click", () => {
 
+            this.scanPdfContent();
+
+        });
 
         // getting 
         Hooks.on('renderActorSheet', async function (app, html, sheetData) {
@@ -115,56 +118,40 @@ export default class PDFExtractor extends FormApplication {
         super.activateListeners(html);
 
     }
-    async getTree(ev) {
-        let frameDoc = this.element.find("#pdfReader")[0].contentWindow.document;
-        let pdfApp = this.element.find("#pdfReader")[0].contentWindow.PDFViewerApplication;
-
+    async getTree(outlines) {
         let itIndex = 0;
-        
-        for (let item of pdfApp.pdfOutlineViewer._outline) {
-            Folder.create({
+
+        for (let item of outlines) {
+            await Folder.create({
                 name: item.title,
                 type: "JournalEntry",
-                
+
                 sort: itIndex,
-                sorting: "n"
-            }).then(async(f)=>{
-                 if (item.items.length > 0) {
-                await this.getSubTree(item, f.id)
-            }
-            itIndex++;
-            });
-           
-        }
-        game.folders.forEach(async (f)=>{
-            await f.update({
-                data:{
-                    sorting:"n"
+                sorting: "m"
+            }).then(async (f) => {
+                if (item.items.length > 0) {
+                    await this.getSubTree(item, f.id)
                 }
-                
-            })
-        })
-
+            });
+            itIndex++;
+        }
     }
-    
-    async getSubTree(parentItem,parentId) {
-        
 
+    async getSubTree(parentItem, parentId) {
         let itIndex = 0;
-
         for (let item of parentItem.items) {
-            Folder.create({
+            await Folder.create({
                 name: item.title,
                 type: "JournalEntry",
                 parent: parentId,
-                sorting:"n",
-                sort:itIndex
-            }).then(async (f)=>{
-              if (item.items.length > 0) {
-                await this.getSubTree(item, f.id);
-            }  
+                sorting: "m",
+                sort: itIndex
+            }).then(async (f) => {
+                if (item.items.length > 0) {
+                    await this.getSubTree(item, f.id);
+                }
             })
-            
+
             itIndex++
         }
 
@@ -172,8 +159,9 @@ export default class PDFExtractor extends FormApplication {
 
     }
     async onFrameLoaded(ev) {
-        let frameDoc = ev.currentTarget.contentWindow.document;
+        let frameDoc = ev.currentTarget.document;
         frameDoc.getElementById("viewer").addEventListener("mouseup", this._onSelection.bind(this));
+
     }
 
     async _onSelection(ev) {
@@ -243,136 +231,42 @@ export default class PDFExtractor extends FormApplication {
 
         //if some text is selected 
         if (frameWin.getSelection().toString().length > 0) {
-
-
             // selected html elements
-
             let firtsLine = frameWin.getSelection().anchorNode.parentElement.closest(".markedContent");
             let lastLine = frameWin.getSelection().focusNode.parentElement.closest(".markedContent");
 
             let firstPage = firtsLine.closest(".page");
             let lastPage = lastLine.closest(".page");
 
-            console.log(firstPage, lastPage)
-            let contents = [].slice.call(frameDoc.querySelectorAll(".markedContent"));
+            let parentcontents = [].slice.call(frameDoc.querySelectorAll(".markedContent"));
+            let presContents = [];
 
+            //recuperer les spans contenant du text dans presContent
             if (firstPage.dataset.pageNumber == lastPage.dataset.pageNumber) {
-
-
-                contents = contents.slice(contents.indexOf(firtsLine), contents.indexOf(lastLine) + 1);
-
+                parentcontents = parentcontents.slice(parentcontents.indexOf(firtsLine), parentcontents.indexOf(lastLine) + 1);
+                for (let c of parentcontents) {
+                    for (let ch of c.children) {
+                        if (ch.role == "presentation") {
+                            presContents.push(ch)
+                        }
+                    }
+                }
             }
 
-            console.log(contents)
+            console.log(presContents)
 
-            //new empty array to store elements
-            let entityContent = [];
 
             // creating a div in order to grab inner html
             let d = document.createElement("div");
+            d.style.display = "relative";
 
+            presContents.forEach(async (el) => {
 
+                let newEl = el.cloneNode(true)
 
-
-            // cleaning original content, deleting linebreak and empty span
-            for (let line of contents) {
-
-                if (line.innerText) {
-
-                    if (line.innerText == " " || line.tagName == "BR") {
-                        if (contents[contents.indexOf(line) - 1]) {
-                            contents[contents.indexOf(line) - 1].innerText += " ";
-                        }
-                        contents.splice(contents.indexOf(line), 1);
-                    }
-
-
-                    //adding space between spans
-
-                    if (line.innerText.endsWith(" ") && contents[contents.indexOf(line) - 1]?.innerText.startsWith(" ")) {
-                        line.innerText = line.innerText.substring(1);
-                    }
-                } else {
-                    contents.splice(contents.indexOf(line), 1);
-                }
-
-            };
-
-            console.log(contents)
-
-            contents.forEach(line => {
-
-                for (let node of line.children) {
-
-                    let newNode = node.cloneNode(true);
-
-                    if (newNode.style.fontSize == "10px") {
-                        entityContent[contents.indexOf(node)] = newNode;
-                    }
-
-                    else if (newNode.style.fontSize == "9.8px" || newNode.style.fontSize == "14px") {
-                        let title = document.createElement("h3");
-                        if (newNode.innerText == contents[contents.indexOf(node) + 1]?.innerText) {
-                            title = document.createElement("h2")
-                        }
-                        if (newNode.hasAttributes()) {
-                            for (let i = 0; i < newNode.attributes.length; i++) {
-                                title.setAttribute(newNode.attributes[i].name, newNode.attributes[i].value);
-                            }
-                        }
-                        title.innerText = newNode.innerText.toUpperCase();
-
-                        entityContent[contents.indexOf(node)] = title;
-                    }
-                    else if (newNode.style.fontSize == "18px") {
-                        let title = document.createElement("h1");
-                        if (newNode.hasAttributes()) {
-                            for (let i = 0; i < newNode.attributes.length; i++) {
-                                title.setAttribute(newNode.attributes[i].name, newNode.attributes[i].value);
-                            }
-                        }
-                        title.innerText = newNode.innerText;
-
-                        entityContent[contents.indexOf(node)] = title;
-                    }
-
-                }
-            });
-            console.log(entityContent)
-            // concatening same elements
-            entityContent.forEach(node => {
-
-
-                if (entityContent.indexOf(node) > 0) {
-                    if (node.tagName === (entityContent[entityContent.indexOf(node) - 1])?.tagName) {
-                        for (let i = entityContent.indexOf(node) - 1; i >= 0; i--) {
-                            if (!entityContent[i].getAttribute("data-doubled")) {
-                                if (entityContent[i].innerHTML != node.innerHTML) {
-                                    if (entityContent[i].innerHTML.length > 1) {
-                                        entityContent[i].innerHTML += " " + node.innerHTML;
-                                    } else {
-                                        entityContent[i].innerHTML += node.innerHTML;
-                                    }
-
-                                }
-
-                                i = 0;
-                            }
-                        }
-
-
-                        node.setAttribute("data-doubled", true);
-                    }
-                }
-            });
-            entityContent.forEach(node => {
-                if (!node.getAttribute("data-doubled")) {
-                    node.removeAttribute("style");
-
-                    d.append(node);
-                }
-            });
-            window.getSelection().empty();
+                d.append(newEl)
+            })
+            console.log(presContents)
 
             return d;
         }
@@ -381,16 +275,54 @@ export default class PDFExtractor extends FormApplication {
 
     async createJournal(element) {
         let j = await JournalEntry.create({
-            content: element.innerHTML.replaceAll("�", ".").replaceAll("•", '<br/>•'),
+            content: element.innerHTML.replaceAll("�", "."),
             name: "new Journal"
         });
 
         j.sheet.render(true);
     }
 
-    setPdfUrl(ev) {
-        this.pdfUrl = ev.currentTarget.value;
-        this._updateObject()
+    async setPdfUrl(ev) {
+        if (this.pdfUrl != ev.currentTarget.value) {
+            this.pdfUrl = ev.currentTarget.value;
+            await this._updateObject();
+            this.render(true)
+        }
+
+    }
+    async scanPdfContent(ev) {
+
+        console.log("---------------scaning")
+        let frameWin = document.getElementById("pdfReader").contentWindow;
+        let frameDoc = frameWin.document;
+        let pairs = [];
+        this.textContents = [];
+
+
+        let pdf = frameWin.PDFViewerApplication.pdfDocument;
+
+        // puttin all textContent by page 
+        for (let i = 1; i <= pdf.numPages; i++) {
+            let page = await pdf.getPage(i).then(async (p) => {
+                let content = await p.getTextContent().then(c => {
+                    c.sourcePage = i;
+                    this.textContents.push(c)
+                });
+            });
+
+
+        }
+        console.log(this.textContents);
+
+        // getting all chapters and outlines of thhe pdf doccument
+
+        this.pdfProxy = pdf;
+        let outlines = await pdf.getOutline().then(o => {
+            this.getTree(o)
+
+        });
+
     }
 
 }
+
