@@ -17,9 +17,9 @@ export default class PDFExtractor extends FormApplication {
     constructor() {
 
         let data = super();
-        data.openActors = [];
-        data.openItems = [];
-        data.openJournals = [];
+        data.openActors = "";
+        data.openItems = "";
+        data.openJournals = "";
 
         return mergeObject(data, game.settings.get("pdfExtractor", "pdfExtractor"));
 
@@ -75,40 +75,35 @@ export default class PDFExtractor extends FormApplication {
         let createBut = html.find("#createJournal")[0];
         createBut.addEventListener("click", () => {
 
-            this.scanPdfContent();
+            this.scanPdfTextContent();
+
+        });
+        let contentBut = html.find("#getContent")[0];
+        contentBut.addEventListener("click", () => {
+
+            this.getFoldersTextContent();
 
         });
 
         // getting 
         Hooks.on('renderActorSheet', async function (app, html, sheetData) {
-            if (!ui.pdfExtractor.openActors.some(act => act == sheetData.item.id)) {
-                ui.pdfExtractor.openActors.push(sheetData.actor.id);
-
-            }
-
-
+            ui.pdfExtractor.openActors = sheetData.actor.id
 
         });
         Hooks.on('renderItemSheet', async function (app, html, sheetData) {
-            if (!ui.pdfExtractor.openItems.some(it => it == sheetData.item.id)) {
-                ui.pdfExtractor.openItems.push(sheetData.item.id);
-            }
-
+            ui.pdfExtractor.openItems = sheetData.item.id
         });
         Hooks.on('renderJournalSheet', async function (app, html, sheetData) {
-            if (!ui.pdfExtractor.openJournals.some(j => j == sheetData.document.id)) {
-                ui.pdfExtractor.openItems.push(sheetData.document.id);
-            }
-
+            ui.pdfExtractor.openJournals = sheetData.document.id
         });
         Hooks.on('closeActorSheet', async function (app, html) {
-            ui.pdfExtractor.openActors = [];
+            ui.pdfExtractor.openActors = "";
         });
         Hooks.on('closeJournalSheet', async function (app, html) {
-            ui.pdfExtractor.openJournals = [];
+            ui.pdfExtractor.openJournals = "";
         });
         Hooks.on('closeItemSheet', async function (app, html) {
-            ui.pdfExtractor.openItems = [];
+            ui.pdfExtractor.openItems = "";
         });
 
 
@@ -116,6 +111,166 @@ export default class PDFExtractor extends FormApplication {
 
         //formApplication listenners
         super.activateListeners(html);
+
+    }
+
+    createFolderContent() {
+
+    }
+
+    async onFrameLoaded(ev) {
+        let frameDoc = ev.currentTarget.document;
+        frameDoc.getElementById("viewer").addEventListener("mouseup", this._onSelection.bind(this));
+
+    }
+
+    async _onSelection(ev) {
+
+        if (document.getElementById("pdfReader").contentWindow.getSelection().toString().length > 0) {
+
+            let entityChoices = [];
+
+            entityChoices.push("JournalEntry");
+            entityChoices.push("Actot");
+            entityChoices.push("Item");
+
+
+            let butts = {};
+            for (let choice of entityChoices) {
+                butts[choice] = {
+                    label: choice,
+
+                    callback: () => {
+                        ui.pdfExtractor.createEntity(choice);
+                    }
+
+                };
+            }
+            if (this.openJournals) {
+                let journal = game.journal.get(this.openJournals)
+                butts["update"] = {
+                    label: "update : " + journal.name,
+                    callback: () => {
+                        ui.pdfExtractor.updateOpenJournal()
+                    }
+                }
+            }
+            let d = new Dialog({
+                title: "fill entity",
+                content: "choose the entity you want to create",
+                buttons: butts
+            }, {
+                left: 100,
+                top: 100,
+                resizable: true
+            });
+            d.render(true);
+        }
+
+    }
+
+    async updateOpenJournal() {
+        let content = await ui.pdfExtractor.getSelectedElements();
+        let journal = await game.journal.get(this.openJournals);
+        await journal.update({
+            content: content.outerHTML.replaceAll("�", "."),
+
+        });
+
+    }
+    async createEntity(type) {
+
+        let content = await ui.pdfExtractor.getSelectedElements();
+
+        switch (type) {
+            case "Actor":
+                await Actor.create({ name: "new", type: stormknight });
+                break;
+            case "JournalEntry":
+                await ui.pdfExtractor.createJournal(content);
+                break;
+            case "Item":
+                await ui.pdfExtractor.createItem(content);
+                break;
+            default:
+
+                break
+        }
+
+    }
+
+
+    async getSelectedElements() {
+
+
+        let frameWin = document.getElementById("pdfReader").contentWindow;
+        let frameDoc = document.getElementById("pdfReader").contentWindow.document;
+
+        //if some text is selected 
+        if (frameWin.getSelection().toString().length > 0) {
+            // selected html elements
+            let firtsLine = frameWin.getSelection().anchorNode.parentElement.closest(".markedContent");
+            let lastLine = frameWin.getSelection().focusNode.parentElement.closest(".markedContent");
+
+            let firstPage = firtsLine.closest(".page");
+            let lastPage = lastLine.closest(".page");
+
+            let parentcontents = [].slice.call(frameDoc.querySelectorAll(".markedContent"));
+            let presContents = [];
+
+            //recuperer les spans contenant du text dans presContent
+            if (firstPage.dataset.pageNumber == lastPage.dataset.pageNumber) {
+                parentcontents = parentcontents.slice(parentcontents.indexOf(firtsLine), parentcontents.indexOf(lastLine) + 1);
+                for (let c of parentcontents) {
+                    for (let ch of c.children) {
+                        if (ch.role == "presentation") {
+                            presContents.push(ch)
+                        }
+                    }
+                }
+            }
+
+            // creating a div in order to grab inner html
+            let d = document.createElement("div");
+
+
+            presContents.forEach(async (el) => {
+
+
+
+                if (!presContents.indexOf(el) == 0 && presContents[presContents.indexOf(el) + 1].innerText != el.innerText) {
+                    let newEl = el.cloneNode(true)
+                    newEl.style.color = "black";
+                    newEl.style.fontSize = "unset";
+                    newEl.style.opacity = "1";
+
+
+                    d.classList.add("centeredCol")
+                    d.append(newEl)
+                }
+
+            })
+
+            return d;
+        }
+    }
+
+
+    async createJournal(element) {
+        let j = await JournalEntry.create({
+            content: element.innerHTML.replaceAll("�", "."),
+            name: "new Journal"
+        });
+
+        j.sheet.render(true);
+    }
+
+    async setPdfUrl(ev) {
+        if (this.pdfUrl != ev.currentTarget.value) {
+            this.pdfUrl = ev.currentTarget.value;
+            await this._updateObject();
+            this.render(true)
+        }
 
     }
     async getTree(outlines) {
@@ -184,137 +339,7 @@ export default class PDFExtractor extends FormApplication {
             itIndex++
         }
     }
-    createFolderContent() {
-
-    }
-
-    async onFrameLoaded(ev) {
-        let frameDoc = ev.currentTarget.document;
-        frameDoc.getElementById("viewer").addEventListener("mouseup", this._onSelection.bind(this));
-
-    }
-
-    async _onSelection(ev) {
-
-        if (document.getElementById("pdfReader").contentWindow.getSelection().toString().length > 0) {
-
-            let entityChoices = [];
-
-            entityChoices.push("JournalEntry");
-            entityChoices.push("Actot");
-            entityChoices.push("Item");
-
-
-            let butts = {};
-            for (let choice of entityChoices) {
-                butts[choice] = {
-                    label: choice,
-
-                    callback: () => {
-                        ui.pdfExtractor.createEntity(choice);
-                    }
-
-                };
-            }
-            let d = new Dialog({
-                title: "fill entity",
-                content: "choose the entity you want to create",
-                buttons: butts
-            }, {
-                left: 100,
-                top: 100,
-                resizable: true
-            });
-            d.render(true);
-        }
-
-    }
-    async createEntity(type) {
-
-        let content = await ui.pdfExtractor.getSelectedElements();
-
-        switch (type) {
-            case "Actor":
-                await Actor.create({ name: "new", type: stormknight });
-                break;
-            case "JournalEntry":
-                await ui.pdfExtractor.createJournal(content);
-                break;
-            case "Item":
-                await ui.pdfExtractor.createItem(content);
-                break;
-            default:
-
-                break
-        }
-
-    }
-
-
-    async getSelectedElements() {
-
-
-        let frameWin = document.getElementById("pdfReader").contentWindow;
-        let frameDoc = document.getElementById("pdfReader").contentWindow.document;
-
-        //if some text is selected 
-        if (frameWin.getSelection().toString().length > 0) {
-            // selected html elements
-            let firtsLine = frameWin.getSelection().anchorNode.parentElement.closest(".markedContent");
-            let lastLine = frameWin.getSelection().focusNode.parentElement.closest(".markedContent");
-
-            let firstPage = firtsLine.closest(".page");
-            let lastPage = lastLine.closest(".page");
-
-            let parentcontents = [].slice.call(frameDoc.querySelectorAll(".markedContent"));
-            let presContents = [];
-
-            //recuperer les spans contenant du text dans presContent
-            if (firstPage.dataset.pageNumber == lastPage.dataset.pageNumber) {
-                parentcontents = parentcontents.slice(parentcontents.indexOf(firtsLine), parentcontents.indexOf(lastLine) + 1);
-                for (let c of parentcontents) {
-                    for (let ch of c.children) {
-                        if (ch.role == "presentation") {
-                            presContents.push(ch)
-                        }
-                    }
-                }
-            }
-
-            // creating a div in order to grab inner html
-            let d = document.createElement("div");
-            d.style.display = "relative";
-
-            presContents.forEach(async (el) => {
-
-                let newEl = el.cloneNode(true)
-
-                d.append(newEl)
-            })
-
-            return d;
-        }
-    }
-
-
-    async createJournal(element) {
-        let j = await JournalEntry.create({
-            content: element.innerHTML.replaceAll("�", "."),
-            name: "new Journal"
-        });
-
-        j.sheet.render(true);
-    }
-
-    async setPdfUrl(ev) {
-        if (this.pdfUrl != ev.currentTarget.value) {
-            this.pdfUrl = ev.currentTarget.value;
-            await this._updateObject();
-            this.render(true)
-        }
-
-    }
-    async scanPdfContent(ev) {
+    async scanPdfTextContent(ev) {
 
         console.log("---------------scaning")
         let frameWin = document.getElementById("pdfReader").contentWindow;
@@ -324,25 +349,33 @@ export default class PDFExtractor extends FormApplication {
 
 
         let pdf = frameWin.PDFViewerApplication.pdfDocument;
+        this.pdfProxy = pdf
 
-        // puttin all textContent by page 
+        // puttin all textContent  
         for (let i = 1; i <= pdf.numPages; i++) {
             let page = await pdf.getPage(i).then(async (p) => {
-                let content = await p.getTextContent().then(c => {
-                    c.sourcePage = i;
-                    this.textContents.push(c)
+                let content = await p.getTextContent().then(p => {
+                    console.log(p)
+                    for (let c of p.items) {
+                        this.textContents.push(c)
+                    }
+
                 });
             });
 
 
         }
 
+        return this._onCreateFolder()
+    }
+    async _onCreateFolder() {
         // getting all chapters and outlines of thhe pdf doccument and creating folders for journal entries
-
-        this.pdfProxy = pdf;
-        let outlines = await pdf.getOutline().then(async (o) => {
+        let outlines = await this.pdfProxy.getOutline().then(async (o) => {
             await this.getTree(o)
         });
+    }
+
+    async getFoldersTextContent() {
         // creating contents in folders
         // getting folders if created by the module
         let moduleFolders = game.folders.filter(m => m.flags.pdfReaderTest);
@@ -381,6 +414,8 @@ export default class PDFExtractor extends FormApplication {
 
         }
     }
+
+
 
 }
 
