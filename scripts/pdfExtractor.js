@@ -120,6 +120,7 @@ export default class PDFExtractor extends FormApplication {
     }
     async getTree(outlines) {
         let itIndex = 0;
+        let pdf = this.pdfProxy;
 
         for (let item of outlines) {
             await Folder.create({
@@ -129,16 +130,32 @@ export default class PDFExtractor extends FormApplication {
                 sort: itIndex,
                 sorting: "m"
             }).then(async (f) => {
+                try {
+                    await pdf.getDestination(item.dest).then(async (dest) => {
+                        let ref = dest[0];
+                        await pdf.getPageIndex(ref).then(async (id) => {
+                            await f.setFlag("pdfReaderTest", "sourcePage", id + 1)
+                        })
+                    })
+
+                } catch (e) {
+                    console.warn(e)
+                }
+
                 if (item.items.length > 0) {
                     await this.getSubTree(item, f.id)
                 }
+
+
             });
             itIndex++;
         }
+
     }
 
     async getSubTree(parentItem, parentId) {
         let itIndex = 0;
+        let pdf = this.pdfProxy;
         for (let item of parentItem.items) {
             await Folder.create({
                 name: item.title,
@@ -147,17 +164,30 @@ export default class PDFExtractor extends FormApplication {
                 sorting: "m",
                 sort: itIndex
             }).then(async (f) => {
+                try {
+                    await pdf.getDestination(item.dest).then(async (dest) => {
+                        let ref = dest[0];
+                        await pdf.getPageIndex(ref).then(async (id) => {
+                            await f.setFlag("pdfReaderTest", "sourcePage", id + 1)
+                        })
+                    })
+
+                } catch (e) {
+                    console.warn(e)
+                }
                 if (item.items.length > 0) {
                     await this.getSubTree(item, f.id);
                 }
+                this.createFolderContent()
             })
 
             itIndex++
         }
-
-
+    }
+    createFolderContent() {
 
     }
+
     async onFrameLoaded(ev) {
         let frameDoc = ev.currentTarget.document;
         frameDoc.getElementById("viewer").addEventListener("mouseup", this._onSelection.bind(this));
@@ -202,7 +232,6 @@ export default class PDFExtractor extends FormApplication {
     async createEntity(type) {
 
         let content = await ui.pdfExtractor.getSelectedElements();
-        console.log(content)
 
         switch (type) {
             case "Actor":
@@ -227,7 +256,6 @@ export default class PDFExtractor extends FormApplication {
 
         let frameWin = document.getElementById("pdfReader").contentWindow;
         let frameDoc = document.getElementById("pdfReader").contentWindow.document;
-        console.log(frameWin.PDFViewerApplication);
 
         //if some text is selected 
         if (frameWin.getSelection().toString().length > 0) {
@@ -253,9 +281,6 @@ export default class PDFExtractor extends FormApplication {
                 }
             }
 
-            console.log(presContents)
-
-
             // creating a div in order to grab inner html
             let d = document.createElement("div");
             d.style.display = "relative";
@@ -266,7 +291,6 @@ export default class PDFExtractor extends FormApplication {
 
                 d.append(newEl)
             })
-            console.log(presContents)
 
             return d;
         }
@@ -312,16 +336,50 @@ export default class PDFExtractor extends FormApplication {
 
 
         }
-        console.log(this.textContents);
 
-        // getting all chapters and outlines of thhe pdf doccument
+        // getting all chapters and outlines of thhe pdf doccument and creating folders for journal entries
 
         this.pdfProxy = pdf;
-        let outlines = await pdf.getOutline().then(o => {
-            this.getTree(o)
-
+        let outlines = await pdf.getOutline().then(async (o) => {
+            await this.getTree(o)
         });
+        // creating contents in folders
+        // getting folders if created by the module
+        let moduleFolders = game.folders.filter(m => m.flags.pdfReaderTest);
+        //sorting them by page
+        moduleFolders.sort((a, b) => {
+            a.flags.pdfReaderTest.sourcePage - b.flags.pdfReaderTest.sourcePage
+        })
+        for (let folder of moduleFolders) {
+            let sourcePage = folder.flags.pdfReaderTest.sourcePage;
+            console.log(folder.name, '_________', sourcePage)
+            let nextFolder = moduleFolders[moduleFolders.indexOf(folder) + 1];
 
+            let lastPage = sourcePage;
+            if (nextFolder) {
+                lastPage = nextFolder.flags.pdfReaderTest.sourcePage;
+            }
+
+            let contents = this.textContents.filter(c => c.sourcePage >= sourcePage && c.sourcePage <= lastPage);
+            let newContents = [];
+            for (let p of contents) {
+                for (let c of p.items) {
+                    newContents.push(c);
+                }
+
+            }
+            console.log(newContents, folder)
+            let firstContent = newContents.filter(c => c.str.toUpperCase == folder.name.toUpperCase);
+            console.log(firstContent)
+            let lastContent;
+            if (nextFolder, folder.name.toUpperCase) {
+                lastContent = newContents.filter(c => c.str.toUpperCase == nextFolder.name.toUpperCase);
+
+            } else { lastContent = newContents[newContents.length - 1] }
+            console.log(firstContent, lastContent)
+
+
+        }
     }
 
 }
