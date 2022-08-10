@@ -32,6 +32,8 @@ export default class PDFExtractor extends FormApplication {
     getData() {
         const data = game.settings.get("pdfExtractor", "pdfExtractor");
 
+
+
         return mergeObject(super.getData(), data);
 
     }
@@ -46,66 +48,42 @@ export default class PDFExtractor extends FormApplication {
             fonts: this.fonts
         };
         await game.settings.set('pdfExtractor', 'pdfExtractor', data);
+        this.render()
 
     }
     async activateListeners(html) {
 
-        //custom listenners
-        /*
-        let scanPdf = html.find("#scanPdf")[0];
-        scanPdf.addEventListener("click", this._onscanPdf.bind(this));
-      
-       
 
-        let pageInput = html.find("#activePage")[0];
-        pageInput.addEventListener("change", this.changePage.bind(this));
-
-        let prevBut = html.find("#pdfPrevious")[0];
-        prevBut.addEventListener("click", this.previous.bind(this));
-
-        let nextBut = html.find("#pdfNext")[0];
-        nextBut.addEventListener("click", this.nextPage.bind(this));
-
-*/
         let inputUrl = html.find("#pdfUrl")[0];
         inputUrl.addEventListener("change", this.setPdfUrl.bind(this));
 
         let iframe = html.find("#pdfReader")[0];
         if (!ui.pdfExtractor.scanned && ui.pdfExtractor.pdfUrl) {
-
             iframe.contentWindow.addEventListener("load", async () => {
                 this.createloading();
                 //getting pdfjs app
                 iframe.contentWindow.PDFViewerApplication.initializedPromise.then(async function () {
-                    console.log(iframe.contentWindow.PDFViewerApplication.eventBus)
-                    //waiting the pdf to be 
+                    //waiting the pdf to be  loaded
                     iframe.contentWindow.PDFViewerApplication.eventBus.on("layersloaded", async () => {
                         console.log(".....pdf loaded");
-
                         await ui.pdfExtractor.scanPdfTextContent()
-
-
                     })
-
                 })
 
             })
         };
 
 
-        let createBut = html.find("#createJournal")[0];
-        createBut.addEventListener("click", () => {
-
-
-
-        });
+        let createBut = html.find("#createFolders")[0];
+        createBut.addEventListener("click", this._onCreateFolders.bind(this));
+        /*
         let contentBut = html.find("#getContent")[0];
         contentBut.addEventListener("click", () => {
 
             this.getFoldersTextContent();
 
         });
-
+*/
         // getting 
         Hooks.on('renderActorSheet', async function (app, html, sheetData) {
             ui.pdfExtractor.openActors = sheetData.actor.id
@@ -333,9 +311,10 @@ export default class PDFExtractor extends FormApplication {
 
     async setPdfUrl(ev) {
         if (this.pdfUrl != ev.currentTarget.value) {
+            this.scanned = false;
             this.pdfUrl = ev.currentTarget.value;
             await this._updateObject();
-            this.render(true)
+
         }
 
     }
@@ -433,32 +412,37 @@ export default class PDFExtractor extends FormApplication {
             });
 
         }
-
         await this.getSizes()
 
     }
 
     async getSizes() {
+        this.sizes = {};
         for (let c of this.textContents) {
             if (!this.sizes[c.height.toString()]) {
-                this.sizes[c.height.toString()] = "";
+                this.sizes[c.height.toString().replace(".", ",")] = "";
 
             }
 
 
         }
-        console.log(this.sizes)
         console.log("***********************scan done");
+        ui.pdfExtractor.sizes = this.sizes;
         this.deleteLoading();
-        ui.pdfExtractor.scanned = true;
-        this.render(true)
+        this.scanned = true;
+        this._updateObject()
 
     }
-    async _onCreateFolder() {
+    async _onCreateFolders(ev) {
+        console.log(this)
+
         // getting all chapters and outlines of thhe pdf doccument and creating folders for journal entries
-        let outlines = await this.pdfProxy.getOutline().then(async (o) => {
-            await this.getTree(o)
-        });
+        let out = await this.pdfProxy.getOutline();
+            console.log("truc")
+             this.getTree(out);
+
+
+
     }
 
     async getFoldersTextContent() {

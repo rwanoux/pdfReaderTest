@@ -73,7 +73,7 @@ input[disabled]#maxPage {
     min-height: 90%
 }
 
-a#createJournal,
+a#createFolders,
 a#getContent {
     text-align: center;
     border: 1px solid white;

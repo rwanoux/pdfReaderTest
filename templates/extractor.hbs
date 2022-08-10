@@ -13,12 +13,11 @@
             <i class="fab fa-searchengin"></i>scan
         </a>
         -->
-        <a id="createJournal">
-            <i class="fas fa-magic"></i>create
+        <a id="createFolders">
+            <i class="fas fa-magic"></i>create folders<i class="fa-solid
+                fa-folder-tree"></i>
         </a>
-        <a id="getContent">
-            <i class="fas fa-magic"></i>getContent
-        </a>
+
 
     </div>
     <div class="flexrow main">
@@ -34,7 +33,7 @@
         {{/unless}}
         <div>
             {{#each sizes as |size el|}}
-            {{size}}
+            <input type="text" value="{{size}}"/>
 
             {{el}}
 
