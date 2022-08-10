@@ -79,15 +79,3 @@ a#getContent {
     margin: 5px;
     padding-top: 10px;
 }
-
-div.centeredCol {
-    position: relative;
-    justify-content: center;
-    flex-direction: column;
-    padding: 0px 5%;
-}
-
-div.centeredCol span {
-    position: absolute;
-    /* padding-left: 6em; */
-}
