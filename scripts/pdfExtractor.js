@@ -21,6 +21,7 @@ export default class PDFExtractor extends FormApplication {
         data.openItems = "";
         data.openJournals = "";
         data.sizes = {};
+        data.scanned = false;
 
         return mergeObject(data, game.settings.get("pdfExtractor", "pdfExtractor"));
 
@@ -69,22 +70,27 @@ export default class PDFExtractor extends FormApplication {
         let inputUrl = html.find("#pdfUrl")[0];
         inputUrl.addEventListener("change", this.setPdfUrl.bind(this));
 
-
         let iframe = html.find("#pdfReader")[0];
-        iframe.contentWindow.addEventListener("load", async () => {
-            this.createloading();
-            //getting pdfjs app
-            iframe.contentWindow.PDFViewerApplication.initializedPromise.then(async function () {
-                console.log(iframe.contentWindow.PDFViewerApplication.eventBus)
-                //waiting the pdf to be 
-                iframe.contentWindow.PDFViewerApplication.eventBus.on("layersloaded", async () => {
-                    console.log(".....pdf loaded")
-                    await ui.pdfExtractor.scanPdfTextContent()
+        if (!ui.pdfExtractor.scanned && ui.pdfExtractor.pdfUrl) {
+
+            iframe.contentWindow.addEventListener("load", async () => {
+                this.createloading();
+                //getting pdfjs app
+                iframe.contentWindow.PDFViewerApplication.initializedPromise.then(async function () {
+                    console.log(iframe.contentWindow.PDFViewerApplication.eventBus)
+                    //waiting the pdf to be 
+                    iframe.contentWindow.PDFViewerApplication.eventBus.on("layersloaded", async () => {
+                        console.log(".....pdf loaded");
+
+                        await ui.pdfExtractor.scanPdfTextContent()
+
+
+                    })
+
                 })
 
             })
-
-        });
+        };
 
 
         let createBut = html.find("#createJournal")[0];
@@ -434,12 +440,18 @@ export default class PDFExtractor extends FormApplication {
 
     async getSizes() {
         for (let c of this.textContents) {
-            if (!this.sizes[c.height.toString()])
-                this.sizes[c.height.toString()] = ""
+            if (!this.sizes[c.height.toString()]) {
+                this.sizes[c.height.toString()] = "";
+
+            }
+
 
         }
+        console.log(this.sizes)
         console.log("***********************scan done");
-        this.deleteLoading()
+        this.deleteLoading();
+        ui.pdfExtractor.scanned = true;
+        this.render(true)
 
     }
     async _onCreateFolder() {

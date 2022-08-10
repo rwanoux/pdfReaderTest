@@ -19,7 +19,8 @@ Hooks.once('init', async function () {
             pdf: null,
             activePage: 1,
             pages: [],
-            fonts: {}
+            fonts: {},
+            sizes: {}
         }
     });
 
@@ -31,7 +32,7 @@ Hooks.once('init', async function () {
 
 Hooks.once('ready', async function () {
     ui.pdfExtractor = new PDFExtractor();
-    //CONFIG.debug.hooks = true;
+    CONFIG.debug.hooks = true;
 
 });
 
