@@ -223,7 +223,7 @@ export default class PDFExtractor extends FormApplication {
                 parentcontents = parentcontents.slice(parentcontents.indexOf(firtsLine), parentcontents.indexOf(lastLine) + 1);
                 for (let c of parentcontents) {
                     for (let ch of c.children) {
-                        if (ch.role == "presentation") {
+                        if (ch.getAttribute("role") == "presentation") {
                             presContents.push(ch)
                         }
                     }
@@ -234,22 +234,33 @@ export default class PDFExtractor extends FormApplication {
             let d = document.createElement("div");
 
 
-            presContents.forEach(async (el) => {
+            for (let i = 0; i < presContents.length; i++) {
+                let el = presContents[i];
+                let nextEl = presContents[i + 1];
+                let lineBreak = false
 
-
-
-                if (!presContents.indexOf(el) == 0 && presContents[presContents.indexOf(el) + 1].innerText != el.innerText) {
-                    let newEl = el.cloneNode(true)
+                if (el.innerText != nextEl?.innerText) {
+                    let newEl = el.cloneNode(true);
+                    if (newEl.innerText === "�") {
+                        if (newEl.style.top == nextEl.style.top) {
+                            newEl.innerText = ". "
+                        } else {
+                            lineBreak = true;
+                        }
+                    }
                     newEl.style.color = "black";
                     newEl.style.fontSize = "unset";
                     newEl.style.opacity = "1";
+                    newEl.style.position = "unset"
 
+                    if (newEl.tagName != "BR") {
+                        d.append(newEl);
+                        if (lineBreak) { d.append(document.createElement("br")) }
 
-                    d.classList.add("centeredCol")
-                    d.append(newEl)
+                    }
                 }
 
-            })
+            }
 
             return d;
         }
