@@ -20,6 +20,7 @@ export default class PDFExtractor extends FormApplication {
         data.openActors = "";
         data.openItems = "";
         data.openJournals = "";
+        data.sizes = {};
 
         return mergeObject(data, game.settings.get("pdfExtractor", "pdfExtractor"));
 
@@ -68,14 +69,28 @@ export default class PDFExtractor extends FormApplication {
         let inputUrl = html.find("#pdfUrl")[0];
         inputUrl.addEventListener("change", this.setPdfUrl.bind(this));
 
+
         let iframe = html.find("#pdfReader")[0];
-        iframe.contentWindow.addEventListener("load", this.onFrameLoaded.bind(this))
+        iframe.contentWindow.addEventListener("load", async () => {
+            this.createloading();
+            //getting pdfjs app
+            iframe.contentWindow.PDFViewerApplication.initializedPromise.then(async function () {
+                console.log(iframe.contentWindow.PDFViewerApplication.eventBus)
+                //waiting the pdf to be 
+                iframe.contentWindow.PDFViewerApplication.eventBus.on("layersloaded", async () => {
+                    console.log(".....pdf loaded")
+                    await ui.pdfExtractor.scanPdfTextContent()
+                })
+
+            })
+
+        });
 
 
         let createBut = html.find("#createJournal")[0];
         createBut.addEventListener("click", () => {
 
-            this.scanPdfTextContent();
+
 
         });
         let contentBut = html.find("#getContent")[0];
@@ -113,13 +128,20 @@ export default class PDFExtractor extends FormApplication {
         super.activateListeners(html);
 
     }
-
-    createFolderContent() {
-
+    createloading() {
+        let loading = document.createElement("div");
+        loading.innerHTML = `
+                <i class="fas fa-cog fa-spin"></i>
+    `
+        loading.id = "pdfLoading";
+        document.body.append(loading)
     }
-
+    deleteLoading() {
+        document.getElementById("pdfLoading").remove()
+    }
     async onFrameLoaded(ev) {
         let frameDoc = ev.currentTarget.document;
+        await this.scanPdfTextContent();
         frameDoc.getElementById("viewer").addEventListener("mouseup", this._onSelection.bind(this));
 
     }
@@ -150,8 +172,9 @@ export default class PDFExtractor extends FormApplication {
                 let journal = game.journal.get(this.openJournals)
                 butts["update"] = {
                     label: "update : " + journal.name,
-                    callback: () => {
-                        ui.pdfExtractor.updateOpenJournal()
+                    callback: async () => {
+                        await ui.pdfExtractor.updateOpenJournal();
+                        clearPdfSelection()
                     }
                 }
             }
@@ -168,12 +191,25 @@ export default class PDFExtractor extends FormApplication {
         }
 
     }
+    clearPdfSelection() {
+        let frameWin = document.getElementById("pdfReader").contentWindow;
 
+        if (frameWin.getSelection) {
+            if (frameWin.getSelection().empty) {  // Chrome
+                frameWin.getSelection().empty();
+            } else if (frameWin.getSelection().removeAllRanges) {  // Firefox
+                frameWin.getSelection().removeAllRanges();
+            }
+        } else if (document.selection) {  // IE?
+            document.selection.empty();
+        }
+
+    }
     async updateOpenJournal() {
         let content = await ui.pdfExtractor.getSelectedElements();
         let journal = await game.journal.get(this.openJournals);
         await journal.update({
-            content: content.outerHTML.replaceAll("�", "."),
+            content: content.outerHTML
 
         });
 
@@ -199,7 +235,9 @@ export default class PDFExtractor extends FormApplication {
 
     }
 
-
+    async _onGetSelection() {
+        console.log(this.textContents)
+    }
     async getSelectedElements() {
 
 
@@ -208,6 +246,11 @@ export default class PDFExtractor extends FormApplication {
 
         //if some text is selected 
         if (frameWin.getSelection().toString().length > 0) {
+
+
+
+
+
             // selected html elements
             let firtsLine = frameWin.getSelection().anchorNode.parentElement.closest(".markedContent");
             let lastLine = frameWin.getSelection().focusNode.parentElement.closest(".markedContent");
@@ -215,9 +258,13 @@ export default class PDFExtractor extends FormApplication {
             let firstPage = firtsLine.closest(".page");
             let lastPage = lastLine.closest(".page");
 
+            await this._onGetSelection()
+
+
+            /*
             let parentcontents = [].slice.call(frameDoc.querySelectorAll(".markedContent"));
             let presContents = [];
-
+    
             //recuperer les spans contenant du text dans presContent
             if (firstPage.dataset.pageNumber == lastPage.dataset.pageNumber) {
                 parentcontents = parentcontents.slice(parentcontents.indexOf(firtsLine), parentcontents.indexOf(lastLine) + 1);
@@ -229,16 +276,16 @@ export default class PDFExtractor extends FormApplication {
                     }
                 }
             }
-
+    
             // creating a div in order to grab inner html
             let d = document.createElement("div");
-
-
+    
+    
             for (let i = 0; i < presContents.length; i++) {
                 let el = presContents[i];
                 let nextEl = presContents[i + 1];
                 let lineBreak = false
-
+    
                 if (el.innerText != nextEl?.innerText) {
                     let newEl = el.cloneNode(true);
                     if (newEl.innerText === "�") {
@@ -252,18 +299,20 @@ export default class PDFExtractor extends FormApplication {
                     newEl.style.fontSize = "unset";
                     newEl.style.opacity = "1";
                     newEl.style.position = "unset"
-
+    
                     if (newEl.tagName != "BR") {
                         d.append(newEl);
                         if (lineBreak) { d.append(document.createElement("br")) }
-
+    
                     }
                 }
-
+    
             }
-
+    
             return d;
+            */
         }
+
     }
 
 
@@ -305,7 +354,10 @@ export default class PDFExtractor extends FormApplication {
                     })
 
                 } catch (e) {
-                    console.warn(e)
+                    alert(`
+                    une erreur s'est produite
+                    ${e}
+                    `)
                 }
 
                 if (item.items.length > 0) {
@@ -350,7 +402,7 @@ export default class PDFExtractor extends FormApplication {
             itIndex++
         }
     }
-    async scanPdfTextContent(ev) {
+    async scanPdfTextContent() {
 
         console.log("---------------scaning")
         let frameWin = document.getElementById("pdfReader").contentWindow;
@@ -366,18 +418,29 @@ export default class PDFExtractor extends FormApplication {
         for (let i = 1; i <= pdf.numPages; i++) {
             let page = await pdf.getPage(i).then(async (p) => {
                 let content = await p.getTextContent().then(p => {
-                    console.log(p)
+
                     for (let c of p.items) {
+                        c.sourcePage = i;
                         this.textContents.push(c)
                     }
-
                 });
             });
 
-
         }
 
-        return this._onCreateFolder()
+        await this.getSizes()
+
+    }
+
+    async getSizes() {
+        for (let c of this.textContents) {
+            if (!this.sizes[c.height.toString()])
+                this.sizes[c.height.toString()] = ""
+
+        }
+        console.log("***********************scan done");
+        this.deleteLoading()
+
     }
     async _onCreateFolder() {
         // getting all chapters and outlines of thhe pdf doccument and creating folders for journal entries
@@ -412,16 +475,12 @@ export default class PDFExtractor extends FormApplication {
                 }
 
             }
-            console.log(newContents, folder)
             let firstContent = newContents.filter(c => c.str.toUpperCase == folder.name.toUpperCase);
-            console.log(firstContent)
             let lastContent;
             if (nextFolder, folder.name.toUpperCase) {
                 lastContent = newContents.filter(c => c.str.toUpperCase == nextFolder.name.toUpperCase);
 
             } else { lastContent = newContents[newContents.length - 1] }
-            console.log(firstContent, lastContent)
-
 
         }
     }

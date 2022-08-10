@@ -21,8 +21,23 @@
         </a>
 
     </div>
+    <div class="flexrow "id="pdfReader">
+        {{#if pdfUrl}}
+        <iframe
+            src="modules/pdfReaderTest/pdfjs/web/viewer.html?file=../../../../{{pdfUrl}}"></iframe>
+        {{else}}
+        <h2>choose a pdf file</h2>
+        {{/if}}
+        <div>
+            {{#each sizes as |size el|}}
+            {{size}}
+
+            {{el}}
+
+            {{/each}}
+
+        </div>
+    </div>
 
 
-    <iframe id="pdfReader"
-        src="modules/pdfReaderTest/pdfjs/web/viewer.html?file=../../../../{{pdfUrl}}"></iframe>
 </form>
