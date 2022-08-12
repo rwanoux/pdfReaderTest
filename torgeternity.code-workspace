@@ -1,0 +1,26 @@
+{
+	"folders": [
+		{
+			"path": "..\\..\\systems\\torgeternity"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "..\\..\\..\\..\\..\\..\\..\\Program Files\\FoundryVTT\\v10"
+		},
+		{
+			"path": "..\\..\\..\\..\\..\\..\\..\\Program Files\\FoundryVTT\\V9_node"
+		},
+		{
+			"path": "..\\te001-core-rulebook"
+		},
+		{
+			"path": "..\\srd-heros-et-dragons"
+		},
+		{
+			"path": "..\\..\\worlds\\torg-fr-journal"
+		}
+	],
+	"settings": {}
+}

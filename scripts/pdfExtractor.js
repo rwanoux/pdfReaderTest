@@ -63,17 +63,25 @@ export default class PDFExtractor extends FormApplication {
         let iframe = html.find("#pdfReader")[0];
         iframe.contentWindow.addEventListener("load", async () => {
 
-            if (!ui.pdfExtractor.scanned && ui.pdfExtractor.pdfUrl) {
-                this.createloading();
-                //getting pdfjs app
-                iframe.contentWindow.PDFViewerApplication.initializedPromise.then(async function () {
-                    //waiting the pdf to be  loaded
+
+
+            //getting pdfjs app
+            iframe.contentWindow.PDFViewerApplication.initializedPromise.then(async function () {
+                //waiting the pdf to be  loaded
+                if (!ui.pdfExtractor.scanned && ui.pdfExtractor.pdfUrl) {
                     iframe.contentWindow.PDFViewerApplication.eventBus.on("layersloaded", async () => {
+                        this.createloading();
                         console.log(".....pdf loaded");
                         ui.pdfExtractor.scanPdfTextContent()
                     })
+                };
+                iframe.contentWindow.PDFViewerApplication.eventBus.on("pagerendered", async () => {
+                    ui.pdfExtractor.setZoomRatio()
                 })
-            };
+
+            })
+
+
             iframe.contentWindow.document.body.addEventListener("mouseup", this._onSelection.bind(this))
 
         })
@@ -122,6 +130,14 @@ export default class PDFExtractor extends FormApplication {
         super.activateListeners(html);
 
     }
+    setZoomRatio() {
+        let frameWin = document.getElementById("pdfReader").contentWindow;
+        let pdf = frameWin.PDFViewerApplication.pdfDocument;
+
+
+        console.log(pdf)
+    }
+
     createloading() {
         let loading = document.createElement("div");
         loading.innerHTML = `
@@ -243,13 +259,16 @@ export default class PDFExtractor extends FormApplication {
         let frameWin = document.getElementById("pdfReader").contentWindow;
         let frameDoc = document.getElementById("pdfReader").contentWindow.document;
 
+
         //if some text is selected 
         if (frameWin.getSelection().toString().length > 0) {
             // selected html elements
-            let firtsLine = frameWin.getSelection().anchorNode.parentElement.closest(".markedContent");
+            let firstLine = frameWin.getSelection().anchorNode.parentElement.closest(".markedContent");
             let lastLine = frameWin.getSelection().focusNode.parentElement.closest(".markedContent");
+            let pdf = frameWin.PDFViewerApplication.pdfDocument;
+            console.log(pdf.promise)
 
-            let firstPage = firtsLine.closest(".page");
+            let firstPage = firstLine.closest(".page");
             let lastPage = lastLine.closest(".page");
 
 
@@ -257,16 +276,16 @@ export default class PDFExtractor extends FormApplication {
             let presContents = [];
 
             //recuperer les spans contenant du text dans presContent
-            if (firstPage.dataset.pageNumber == lastPage.dataset.pageNumber) {
-                parentcontents = parentcontents.slice(parentcontents.indexOf(firtsLine), parentcontents.indexOf(lastLine) + 1);
-                for (let c of parentcontents) {
-                    for (let ch of c.children) {
-                        if (ch.getAttribute("role") == "presentation" && ch.tagName != "BR") {
-                            presContents.push(ch)
-                        }
+
+            parentcontents = parentcontents.slice(parentcontents.indexOf(firstLine), parentcontents.indexOf(lastLine) + 1);
+            for (let c of parentcontents) {
+                for (let ch of c.children) {
+                    if (ch.getAttribute("role") == "presentation" && ch.tagName != "BR") {
+                        presContents.push(ch)
                     }
                 }
             }
+
 
             // creating a div in order to grab inner html
             let d = document.createElement("div");
@@ -275,38 +294,53 @@ export default class PDFExtractor extends FormApplication {
             for (let i = 0; i < presContents.length; i++) {
                 let el = presContents[i];
                 let nextEl = presContents[i + 1];
-                let lineBreak = false
+                let parBreak = false
 
 
                 let newEl = el.cloneNode(true);
+
+                //repérer les points et retours paragraphes
                 if (newEl.innerText === "�") {
                     newEl.innerText = ". ";
                     if (nextEl) {
                         if (parseInt(el.style.top.split("px")[0]) + parseInt(el.style.fontSize.split("px")[0]) < parseInt(nextEl.style.top.split("px")[0]) || parseInt(el.style.top.split("px")[0]) + parseInt(el.style.fontSize.split("px")[0]) > parseInt(nextEl.style.top.split("px")[0])) {
                             let firstNextLetter = nextEl.innerText[0];
                             if (firstNextLetter == firstNextLetter.toUpperCase()) {
-                                lineBreak = true;
+                                parBreak = true;
+                            } else {
+                                newEl.innerText = " "
                             }
-
-                        };
+                        }
                     }
-
-
                 }
+                //si retour à la ligne ajout d'espace si besoin 
+                if (nextEl) {
+                    if (parseInt(el.style.top.split("px")[0]) + parseInt(el.style.fontSize.split("px")[0]) < parseInt(nextEl.style.top.split("px")[0]) || parseInt(el.style.top.split("px")[0]) + parseInt(el.style.fontSize.split("px")[0]) > parseInt(nextEl.style.top.split("px")[0])) {
+
+                        if (!el.innerText.endsWith(" ") && !nextEl.innerText.startsWith(" ") && !parBreak) {
+                            el.innerText += " "
+                        }
+                    }
+                }
+
+
+
+
+
                 newEl.style.color = "black";
                 newEl.style.fontSize = "unset";
+                newEl.style.fontFamily = "unset";
                 newEl.style.opacity = "1";
                 newEl.style.position = "unset"
 
 
                 d.append(newEl);
-                if (lineBreak) { d.append(document.createElement("br")) }
+                if (parBreak) { d.append(document.createElement("br")) }
 
 
 
 
             }
-            console.log(d.children);
             return d;
 
         }
@@ -336,7 +370,6 @@ export default class PDFExtractor extends FormApplication {
         let frameWin = document.getElementById("pdfReader").contentWindow;
         let pdf = frameWin.PDFViewerApplication.pdfDocument;
 
-        console.log(outlines)
         for (let item of outlines) {
             let itIndex = outlines.indexOf(item)
             Folder.create({
@@ -347,11 +380,9 @@ export default class PDFExtractor extends FormApplication {
                 sorting: "m"
             }).then(async (f) => {
                 try {
-                    console.log(item, item.dest)
                     pdf.getDestination(item.dest).then(async (dest) => {
 
                         let ref = dest[0];
-                        console.log(ref)
                         pdf.getPageIndex(ref).then(async (id) => {
                             f.setFlag("pdfReaderTest", "sourcePage", id + 1)
                         })
