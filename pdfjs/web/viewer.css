@@ -73,11 +73,11 @@
 }
 
 .textLayer ::-moz-selection {
-  background: rgba(0, 0, 255, 1);
+  background: rgba(0, 0, 255, 0.323);
 }
 
 .textLayer ::selection {
-  background: rgba(0, 0, 255, 1);
+  background: rgb(0 0 255 / 25%);
 }
 
 /* Avoids https://github.com/mozilla/pdf.js/issues/13840 in Chrome */
