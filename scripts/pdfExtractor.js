@@ -70,9 +70,9 @@ export default class PDFExtractor extends FormApplication {
                 //waiting the pdf to be  loaded
                 if (!ui.pdfExtractor.scanned && ui.pdfExtractor.pdfUrl) {
                     iframe.contentWindow.PDFViewerApplication.eventBus.on("layersloaded", async () => {
-                        this.createloading();
+                        ui.pdfExtractor.createloading();
                         console.log(".....pdf loaded");
-                        ui.pdfExtractor.scanPdfTextContent()
+                        await ui.pdfExtractor.scanPdfTextContent();
                     })
                 };
                 iframe.contentWindow.PDFViewerApplication.eventBus.on("pagerendered", async () => {
@@ -380,16 +380,16 @@ export default class PDFExtractor extends FormApplication {
                 sorting: "m"
             }).then(async (f) => {
                 try {
-                    pdf.getDestination(item.dest).then(async (dest) => {
+                    await pdf.getDestination(item.dest).then(async (dest) => {
 
                         let ref = dest[0];
                         pdf.getPageIndex(ref).then(async (id) => {
-                            f.setFlag("pdfReaderTest", "sourcePage", id + 1)
+                            await f.setFlag("pdfReaderTest", "sourcePage", id + 1)
                         })
                     })
 
                 } catch (e) {
-                    console.log(e);
+                    console.warn(e);
                 }
 
                 if (item.items.length > 0) {
@@ -415,10 +415,10 @@ export default class PDFExtractor extends FormApplication {
                 sort: itIndex
             }).then(async (f) => {
                 try {
-                    pdf.getDestination(item.dest).then(async (dest) => {
+                    await pdf.getDestination(item.dest).then(async (dest) => {
                         let ref = dest[0];
                         pdf.getPageIndex(ref).then(async (id) => {
-                            f.setFlag("pdfReaderTest", "sourcePage", id + 1)
+                            await f.setFlag("pdfReaderTest", "sourcePage", id + 1)
                         })
                     })
 
@@ -428,7 +428,7 @@ export default class PDFExtractor extends FormApplication {
                 if (item.items.length > 0) {
                     this.getSubTree(item, f.id);
                 }
-                ui.pdfExtractor.createFolderContent()
+                ui.pdfExtractor.getFoldersTextContent()
             })
 
             itIndex++
@@ -448,7 +448,7 @@ export default class PDFExtractor extends FormApplication {
         // puttin all textContent  
         for (let i = 1; i <= pdf.numPages; i++) {
             let page = pdf.getPage(i).then(async (p) => {
-                let content = p.getTextContent().then(p => {
+                let content = await p.getTextContent().then(p => {
 
                     for (let c of p.items) {
                         c.sourcePage = i;
@@ -469,8 +469,6 @@ export default class PDFExtractor extends FormApplication {
                 this.sizes[c.height.toString().replace(".", ",")] = "";
 
             }
-
-
         }
         console.log("***********************scan done");
         ui.pdfExtractor.sizes = this.sizes;
@@ -494,7 +492,8 @@ export default class PDFExtractor extends FormApplication {
     async getFoldersTextContent() {
         // creating contents in folders
         // getting folders if created by the module
-        let moduleFolders = game.folders.filter(m => m.flags.pdfReaderTest);
+        let moduleFolders = await game.folders.filter(mf => mf.flags.pdfReaderTest);
+        console.log(moduleFolders)
         //sorting them by page
         moduleFolders.sort((a, b) => {
             a.flags.pdfReaderTest.sourcePage - b.flags.pdfReaderTest.sourcePage
@@ -523,7 +522,8 @@ export default class PDFExtractor extends FormApplication {
                 lastContent = newContents.filter(c => c.str.toUpperCase == nextFolder.name.toUpperCase);
 
             } else { lastContent = newContents[newContents.length - 1] }
-
+            console.log(folder.name + '=============================');
+            console.log(firstContent, lastContent)
         }
     }
 
