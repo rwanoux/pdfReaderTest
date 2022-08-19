@@ -222,7 +222,7 @@ export default class PDFExtractor extends FormApplication {
             let journal = game.journal.get(this.openJournals);
             console.log(journal)
             journal.update({
-                content: content.innerHTML.replace("�", ". ")
+                content: journal.data.content + "<br/>" + content.innerHTML.replace("�", ". ").replace("�", "")
 
             });
 
@@ -298,43 +298,58 @@ export default class PDFExtractor extends FormApplication {
 
 
                 let newEl = el.cloneNode(true);
+                let firstNextLetter = nextEl?.innerText[0];
 
+                if (newEl.innerText == newEl.innerText.toUpperCase()) {
+                    if (/^[a-zA-Z\s]+$/.test(newEl.innerText) && newEl.innerText.length > 1) {
+                        let title = document.createElement("h2");
+                        title.innerText = newEl.innerText;
+                        newEl = title
+                    };
+
+                }
                 //repérer les points et retours paragraphes
                 if (newEl.innerText === "�") {
                     newEl.innerText = ". ";
                     if (nextEl) {
+
                         if (parseInt(el.style.top.split("px")[0]) + parseInt(el.style.fontSize.split("px")[0]) < parseInt(nextEl.style.top.split("px")[0]) || parseInt(el.style.top.split("px")[0]) + parseInt(el.style.fontSize.split("px")[0]) > parseInt(nextEl.style.top.split("px")[0])) {
-                            let firstNextLetter = nextEl.innerText[0];
+
+                            console.log(firstNextLetter)
                             if (firstNextLetter == firstNextLetter.toUpperCase()) {
                                 parBreak = true;
-                            } else {
+                            }
+                            else {
                                 newEl.innerText = " "
                             }
                         }
                     }
                 }
+
                 //si retour à la ligne ajout d'espace si besoin 
                 if (nextEl) {
-                    if (parseInt(el.style.top.split("px")[0]) + parseInt(el.style.fontSize.split("px")[0]) < parseInt(nextEl.style.top.split("px")[0]) || parseInt(el.style.top.split("px")[0]) + parseInt(el.style.fontSize.split("px")[0]) > parseInt(nextEl.style.top.split("px")[0])) {
+                    if (firstNextLetter == "•") {
+                        parBreak = true;
+                    }
+                    if (parseInt(newEl.style.top.split("px")[0]) + parseInt(newEl.style.fontSize.split("px")[0]) < parseInt(nextEl.style.top.split("px")[0]) || parseInt(newEl.style.top.split("px")[0]) + parseInt(newEl.style.fontSize.split("px")[0]) > parseInt(nextEl.style.top.split("px")[0])) {
 
-                        if (!el.innerText.endsWith(" ") && !nextEl.innerText.startsWith(" ") && !parBreak) {
-                            el.innerText += " "
+                        if (!newEl.innerText.endsWith(" ") && !nextEl.innerText.startsWith(" ") && !parBreak) {
+                            newEl.innerText += " "
                         }
+                    }
+
+                }
+
+                newEl.removeAttribute("style")
+
+                if (!nextEl) {
+                    d.append(newEl);
+                } else {
+                    if (newEl.innerText != nextEl.innerText) {
+                        d.append(newEl);
                     }
                 }
 
-
-
-
-
-                newEl.style.color = "black";
-                newEl.style.fontSize = "unset";
-                newEl.style.fontFamily = "unset";
-                newEl.style.opacity = "1";
-                newEl.style.position = "unset"
-
-
-                d.append(newEl);
                 if (parBreak) { d.append(document.createElement("br")) }
 
 
